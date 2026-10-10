@@ -2,9 +2,18 @@
 //   grid: { kind: 'grid', w, h, items } — items sit at x/y and take def.w × def.h cells
 //   slot: { kind: 'slot', accepts, locked?, items } — holds one item whose def.slot matches
 
-import type { GridStorage, Item, ItemDef, Storage } from './models.ts'
+import type { GridStorage, Item, ItemDef, SlotStorage, Storage } from './models.ts'
 
-type Spot = { x: number; y: number }
+interface Spot {
+  x: number
+  y: number
+}
+
+export function findSlot(slots: SlotStorage[], id: string): SlotStorage {
+  const slot = slots.find((s) => s.id === id)
+  if (!slot) throw new Error(`Unknown slot: ${id}`)
+  return slot
+}
 
 export function fits(target: Storage, def: ItemDef, x: number, y: number, ignore: Item | null = null): boolean {
   if (target.kind === 'slot') {

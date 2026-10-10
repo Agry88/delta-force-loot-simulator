@@ -85,6 +85,7 @@ async function call(method: string, body: object, tries = 4): Promise<unknown> {
 
 async function listItems(): Promise<ApiItem[]> {
   const items: ApiItem[] = []
+  let skipped = 0
   let pageToken: string | null | undefined
   do {
     const page = await call('ListItems', { pageSize: 1000, ...(pageToken && { pageToken }) })
@@ -92,9 +93,12 @@ async function listItems(): Promise<ApiItem[]> {
     for (const v of batch) {
       const item = parseItem(v)
       if (item) items.push(item)
+      else skipped++
     }
     pageToken = batch.length && isRecord(page) ? str(page.nextPageToken) : null
   } while (pageToken)
+  // A jump here usually means the API changed its response shape.
+  if (skipped) console.warn(`skipped ${skipped} items without an id or name`)
   return items
 }
 

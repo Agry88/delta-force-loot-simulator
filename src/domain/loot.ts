@@ -1,5 +1,5 @@
 import type { ItemRepository } from '../data/itemRepository/itemRepository.ts'
-import { randomSpot } from './grid.ts'
+import { findSlot, randomSpot } from './grid.ts'
 import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, Player, Rarity, SlotStorage, SlotType } from './models.ts'
 import { RARITY_WEIGHT } from './rarity.ts'
 
@@ -78,12 +78,6 @@ function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false,
     searching: false,
     owned,
   }
-}
-
-export function findSlot(slots: SlotStorage[], id: string): SlotStorage {
-  const slot = slots.find((s) => s.id === id)
-  if (!slot) throw new Error(`Unknown slot: ${id}`)
-  return slot
 }
 
 function makeSlots(owner: Owner): SlotStorage[] {

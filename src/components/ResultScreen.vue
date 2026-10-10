@@ -20,8 +20,7 @@ const items = computed(() => [...props.result.items].sort((a, b) => b.value - a.
 const total = computed(() => items.value.reduce((s, it) => s + it.value, 0))
 const best = computed(() => items.value[0])
 const byRarity = computed(() =>
-  RARITY_LIST.map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length }))
-    .filter((x) => x.count),
+  RARITY_LIST.map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length })).filter((x) => x.count),
 )
 </script>
 
