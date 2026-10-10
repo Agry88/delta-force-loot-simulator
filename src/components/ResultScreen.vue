@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RARITIES } from '../data/items.js'
 import { formatValue } from '../lib/format.js'
+import { t, tn } from '../i18n/index.js'
 
 const props = defineProps({ result: { type: Object, required: true } })
 const emit = defineEmits(['restart'])
@@ -18,43 +19,43 @@ const byRarity = computed(() =>
 
 <template>
   <div class="result">
-    <h1>EXTRACTION SUCCESSFUL</h1>
+    <h1>{{ t('result.title') }}</h1>
 
     <div class="summary">
       <div class="big">
-        <span class="label">Total Value</span>
+        <span class="label">{{ t('result.total') }}</span>
         <b>{{ formatValue(total) }}</b>
       </div>
-      <div><span class="label">Items</span><b>{{ items.length }}</b></div>
-      <div><span class="label">Containers</span><b>{{ result.containersOpened }}</b></div>
+      <div><span class="label">{{ t('result.items') }}</span><b>{{ items.length }}</b></div>
+      <div><span class="label">{{ t('result.containers') }}</span><b>{{ result.containersOpened }}</b></div>
     </div>
 
     <div v-if="best" class="best" :class="`r${best.rarity}`">
       <span class="icon">{{ best.icon }}</span>
       <div>
-        <div class="label">Best find · {{ RARITIES[best.rarity] }}</div>
-        <div class="best-name">{{ best.name }}</div>
+        <div class="label">{{ t('result.best') }} · {{ tn(RARITIES[best.rarity]) }}</div>
+        <div class="best-name">{{ tn(best.name) }}</div>
         <div>{{ formatValue(best.value) }}</div>
       </div>
     </div>
 
     <div v-if="byRarity.length" class="rarities">
       <span v-for="r in byRarity" :key="r.rarity" class="chip" :class="`r${r.rarity}`">
-        {{ RARITIES[r.rarity] }} × {{ r.count }}
+        {{ tn(RARITIES[r.rarity]) }} × {{ r.count }}
       </span>
     </div>
 
     <ul v-if="items.length" class="list">
       <li v-for="(it, i) in items" :key="i" :class="`r${it.rarity}`">
         <span class="icon">{{ it.icon }}</span>
-        <span class="name">{{ it.name }}</span>
-        <span class="where">{{ it.where }}</span>
+        <span class="name">{{ tn(it.name) }}</span>
+        <span class="where">{{ tn(it.where) }}</span>
         <span class="val">{{ formatValue(it.value) }}</span>
       </li>
     </ul>
-    <p v-else class="empty">You walked out empty-handed. Grab something next time!</p>
+    <p v-else class="empty">{{ t('result.empty') }}</p>
 
-    <button class="btn-again" @click="emit('restart')">RAID AGAIN</button>
+    <button class="btn-again" @click="emit('restart')">{{ t('result.again') }}</button>
   </div>
 </template>
 

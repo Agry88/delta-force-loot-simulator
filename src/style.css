@@ -12,7 +12,7 @@
   --loot: #7a1f24;
   --cell: 48px;
 
-  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-family: 'Rajdhani', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;

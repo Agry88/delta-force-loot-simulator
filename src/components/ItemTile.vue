@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { SEARCH_TIME } from '../data/items.js'
 import { formatShort } from '../lib/format.js'
 import { hideTooltip, showTooltip } from '../lib/tooltip.js'
+import { tn } from '../i18n/index.js'
 
 // mode 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
 const props = defineProps({
@@ -44,7 +45,7 @@ function onHover(e) {
     @mouseleave="hideTooltip"
   >
     <template v-if="item.revealed">
-      <span class="name">{{ item.def.name }}</span>
+      <span class="name">{{ tn(item.def.name) }}</span>
       <span class="icon">{{ item.def.icon }}</span>
       <span class="corner" :class="{ empty: max && mode === 'slot' && item.cond === 0 }">{{ corner }}</span>
     </template>

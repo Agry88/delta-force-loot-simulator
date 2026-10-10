@@ -1,14 +1,31 @@
 <script setup>
+import { LOOT_MODES } from '../data/items.js'
+import { t } from '../i18n/index.js'
+
 defineProps({ duration: { type: Number, required: true } })
+const mode = defineModel('mode', { type: String, default: 'both' })
 const emit = defineEmits(['start'])
 </script>
 
 <template>
   <div class="start">
-    <h1>LOOT SIMULATOR</h1>
-    <p class="sub">You have {{ duration }} seconds. Search containers, grab the best loot, extract.</p>
-    <button class="btn-start" @click="emit('start')">START</button>
-    <p class="hint">Click an item to quick-move it · Drag to place it exactly · Safebox is yours</p>
+    <h1>{{ t('start.title') }}</h1>
+    <p class="sub">{{ t('start.sub', { seconds: duration }) }}</p>
+    <div class="modes" role="radiogroup" :aria-label="t('start.modeLabel')">
+      <span class="modes-label">{{ t('start.modeLabel') }}</span>
+      <button
+        v-for="m in LOOT_MODES"
+        :key="m"
+        role="radio"
+        :aria-checked="mode === m"
+        :class="{ active: mode === m }"
+        @click="mode = m"
+      >
+        {{ t(`start.mode.${m}`) }}
+      </button>
+    </div>
+    <button class="btn-start" @click="emit('start')">{{ t('start.button') }}</button>
+    <p class="hint">{{ t('start.hint') }}</p>
   </div>
 </template>
 
@@ -34,6 +51,40 @@ h1 {
   margin: 0;
   color: var(--text);
   font-size: 18px;
+}
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.modes-label {
+  width: 100%;
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.modes button {
+  min-width: 120px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid #2c353e;
+  cursor: pointer;
+}
+.modes button:hover {
+  color: var(--text-strong);
+  border-color: #4a5560;
+}
+.modes button.active {
+  color: var(--text-strong);
+  background: linear-gradient(180deg, transparent, rgb(58 214 176 / 0.14));
+  border-color: var(--accent);
 }
 .btn-start {
   margin-top: 16px;

@@ -190,6 +190,11 @@ function createCrate() {
   return { name: type.name, slots: [], grids: [grid] }
 }
 
-export function createLootContainer() {
+// What a raid can turn up: 'crate', 'body', or 'both'.
+export const LOOT_MODES = ['both', 'crate', 'body']
+
+export function createLootContainer(mode = 'both') {
+  if (mode === 'crate') return createCrate()
+  if (mode === 'body') return createBody()
   return Math.random() < 0.4 ? createBody() : createCrate()
 }

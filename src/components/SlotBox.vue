@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import ItemTile from './ItemTile.vue'
+import { tn } from '../i18n/index.js'
 
 const PLACEHOLDER = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
 
@@ -14,7 +15,7 @@ const item = computed(() => props.slot.items[0])
   <div
     class="slot"
     :class="{ wide: slot.wide, locked: slot.locked, labelled: slot.label }"
-    :title="item ? '' : slot.name"
+    :title="item ? '' : tn(slot.name)"
     @dragover.prevent
     @drop.prevent="emit('drop-at', 0, 0)"
   >

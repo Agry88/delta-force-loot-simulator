@@ -1,6 +1,7 @@
 <script setup>
 import GridContainer from './GridContainer.vue'
 import { usedCells } from '../lib/grid.js'
+import { t, tn } from '../i18n/index.js'
 
 defineOptions({ inheritAttrs: false })
 defineProps({
@@ -12,8 +13,8 @@ defineProps({
 <template>
   <div class="storage">
     <div class="head">
-      <span>{{ grid.name }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
-      <span class="q" :title="note || `${grid.w}×${grid.h} storage`">?</span>
+      <span>{{ tn(grid.name) }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
+      <span class="q" :title="note || t('storage.size', { w: grid.w, h: grid.h })">?</span>
       <em v-if="note">{{ note }}</em>
     </div>
     <div class="body">

@@ -7,12 +7,17 @@ import { createLootContainer, createPlayer, RARITIES, SEARCH_TIME } from '../dat
 import { findSpot, fits } from '../lib/grid.js'
 import { formatClock, formatValue } from '../lib/format.js'
 import { hideTooltip, tooltip } from '../lib/tooltip.js'
+import { t, tn } from '../i18n/index.js'
+import LangToggle from './LangToggle.vue'
 
-const props = defineProps({ duration: { type: Number, required: true } })
+const props = defineProps({
+  duration: { type: Number, required: true },
+  mode: { type: String, default: 'both' },
+})
 const emit = defineEmits(['finish'])
 
 const player = reactive(createPlayer())
-const loot = ref(createLootContainer())
+const loot = ref(createLootContainer(props.mode))
 const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
@@ -91,7 +96,7 @@ async function runSearch() {
 
 function nextContainer() {
   hideTooltip()
-  loot.value = createLootContainer()
+  loot.value = createLootContainer(props.mode)
   containersOpened.value++
   runSearch()
 }
@@ -123,7 +128,7 @@ function quickMove(item, from) {
     const spot = findSpot(t, item.def)
     if (spot) return moveItem(item, from, t, spot.x, spot.y)
   }
-  flash('Not enough space')
+  flash(t('raid.noSpace'))
 }
 
 let drag = null
@@ -135,7 +140,7 @@ function onDrop(target, cx, cy) {
   const y = target.kind === 'slot' ? 0 : cy - gy
   if (target === from && target.kind === 'slot') return
   if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
-  else flash(target.kind === 'slot' ? "Can't equip that here" : "Doesn't fit there")
+  else flash(t(target.kind === 'slot' ? 'raid.cantEquip' : 'raid.doesntFit'))
 }
 
 // Event handlers for one storage (grid or slot), spread onto its component.
@@ -158,15 +163,16 @@ const tipStyle = computed(() => ({
     <header class="topbar">
       <nav class="tabs">
         <kbd>Q</kbd>
-        <span class="tab active">CHARACTER</span>
-        <span class="tab">HEALTH</span>
+        <span class="tab active">{{ t('raid.tabCharacter') }}</span>
+        <span class="tab">{{ t('raid.tabHealth') }}</span>
         <kbd>E</kbd>
       </nav>
       <div class="timer" :class="{ danger: remaining <= 10 }">
-        <span>Time to Extraction</span>
+        <span>{{ t('raid.timeToExtraction') }}</span>
         <span class="clock">◷</span>
         <b>{{ formatClock(remaining) }}</b>
       </div>
+      <LangToggle />
     </header>
 
     <main class="columns">
@@ -185,14 +191,14 @@ const tipStyle = computed(() => ({
             <b>80</b><small>/80</small>
             <span class="hp-bar"><span /></span>
           </div>
-          <div class="callsign">Operator</div>
+          <div class="callsign">{{ t('raid.callsign') }}</div>
         </div>
       </section>
 
       <section class="panel inventory">
         <div class="earnings">
           <span class="menu">☰</span>
-          Total Battle Earnings
+          {{ t('raid.earnings') }}
           <span class="coin" />
           <b>{{ formatValue(earnings) }}</b>
         </div>
@@ -201,7 +207,7 @@ const tipStyle = computed(() => ({
             v-for="g in player.grids"
             :key="g.id"
             :grid="g"
-            :note="g.id === 'safebox' ? 'Protected' : ''"
+            :note="g.id === 'safebox' ? t('raid.protected') : ''"
             v-on="on(g)"
           />
         </div>
@@ -209,9 +215,9 @@ const tipStyle = computed(() => ({
 
       <section class="panel loot">
         <div class="loot-head">
-          LOOT
-          <span class="loot-name">{{ loot.name }}</span>
-          <em>{{ searching ? 'Searching…' : 'Searched' }}</em>
+          {{ t('raid.loot') }}
+          <span class="loot-name">{{ tn(loot.name) }}</span>
+          <em>{{ t(searching ? 'raid.searching' : 'raid.searched') }}</em>
         </div>
         <div :key="containersOpened" class="scroll">
           <div v-if="loot.slots.length" class="loot-gear">
@@ -224,21 +230,21 @@ const tipStyle = computed(() => ({
             />
           </div>
           <StorageSection v-for="g in loot.grids" :key="g.id" :grid="g" v-on="on(g)" />
-          <button class="next" @click="nextContainer">Search next container →</button>
+          <button class="next" @click="nextContainer">{{ t('raid.next') }}</button>
         </div>
       </section>
     </main>
 
     <footer class="hints">
-      <span><kbd>LMB</kbd> Quick Move</span>
-      <span class="desktop-only"><kbd>Drag</kbd> Carry / Put Back</span>
-      <span class="desktop-only"><kbd>Drag</kbd> Equip / Swap</span>
-      <button class="extract" @click="finish"><kbd>Esc</kbd> Extract</button>
+      <span><kbd>LMB</kbd> {{ t('raid.hintQuickMove') }}</span>
+      <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintCarry') }}</span>
+      <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintEquip') }}</span>
+      <button class="extract" @click="finish"><kbd>Esc</kbd> {{ t('raid.extract') }}</button>
     </footer>
 
     <div v-if="tooltip.item" class="tooltip" :style="tipStyle">
-      <div class="tip-name">{{ tooltip.item.def.name }}</div>
-      <div class="tip-rarity" :class="`r${tooltip.item.def.rarity}`">{{ RARITIES[tooltip.item.def.rarity] }}</div>
+      <div class="tip-name">{{ tn(tooltip.item.def.name) }}</div>
+      <div class="tip-rarity" :class="`r${tooltip.item.def.rarity}`">{{ tn(RARITIES[tooltip.item.def.rarity]) }}</div>
       <div class="tip-value"><span class="coin" /> {{ formatValue(tooltip.item.value) }}</div>
     </div>
 
