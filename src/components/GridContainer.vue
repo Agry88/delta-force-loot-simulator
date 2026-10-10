@@ -1,11 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import ItemTile from './ItemTile.vue'
+import type { GridStorage, Item } from '../types.ts'
 
-const props = defineProps({ grid: { type: Object, required: true } })
-const emit = defineEmits(['item-click', 'drag-start', 'drop-at'])
+const props = defineProps<{ grid: GridStorage }>()
+const emit = defineEmits<{
+  'item-click': [item: Item]
+  'drag-start': [item: Item, gx: number, gy: number]
+  'drop-at': [cx: number, cy: number]
+}>()
 
-function onDrop(e) {
-  const r = e.currentTarget.getBoundingClientRect()
+function onDrop(e: DragEvent) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const cell = r.width / props.grid.w
   emit('drop-at', Math.floor((e.clientX - r.left) / cell), Math.floor((e.clientY - r.top) / cell))
 }

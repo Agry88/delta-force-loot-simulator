@@ -1,5 +1,5 @@
-<script setup>
-import { LOCALES, locale, setLocale } from '../i18n/index.js'
+<script setup lang="ts">
+import { LOCALES, locale, setLocale } from '../i18n/index.ts'
 </script>
 
 <template>

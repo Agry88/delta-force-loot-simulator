@@ -2,7 +2,11 @@
 //   grid: { kind: 'grid', w, h, items } — items sit at x/y and take def.w × def.h cells
 //   slot: { kind: 'slot', accepts, locked?, items } — holds one item whose def.slot matches
 
-export function fits(target, def, x, y, ignore = null) {
+import type { GridStorage, Item, ItemDef, Storage } from '../types.ts'
+
+type Spot = { x: number; y: number }
+
+export function fits(target: Storage, def: ItemDef, x: number, y: number, ignore: Item | null = null): boolean {
   if (target.kind === 'slot') {
     return !target.locked && def.slot === target.accepts && target.items.every((it) => it === ignore)
   }
@@ -17,9 +21,9 @@ export function fits(target, def, x, y, ignore = null) {
   )
 }
 
-function freeSpots(target, def) {
+function freeSpots(target: Storage, def: ItemDef): Spot[] {
   if (target.kind === 'slot') return fits(target, def, 0, 0) ? [{ x: 0, y: 0 }] : []
-  const spots = []
+  const spots: Spot[] = []
   for (let y = 0; y <= target.h - def.h; y++) {
     for (let x = 0; x <= target.w - def.w; x++) {
       if (fits(target, def, x, y)) spots.push({ x, y })
@@ -29,16 +33,16 @@ function freeSpots(target, def) {
 }
 
 // First free spot scanning row by row, or null when the item doesn't fit.
-export function findSpot(target, def) {
+export function findSpot(target: Storage, def: ItemDef): Spot | null {
   return freeSpots(target, def)[0] ?? null
 }
 
 // A random free spot, used to scatter loot around a container.
-export function randomSpot(target, def) {
+export function randomSpot(target: Storage, def: ItemDef): Spot | null {
   const spots = freeSpots(target, def)
   return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null
 }
 
-export function usedCells(grid) {
+export function usedCells(grid: GridStorage): number {
   return grid.items.reduce((sum, it) => sum + it.def.w * it.def.h, 0)
 }

@@ -1,10 +1,11 @@
-<script setup>
-import { LOOT_MODES } from '../data/items.js'
-import { t } from '../i18n/index.js'
+<script setup lang="ts">
+import { LOOT_MODES } from '../data/items.ts'
+import { t } from '../i18n/index.ts'
+import type { LootMode } from '../types.ts'
 
-defineProps({ duration: { type: Number, required: true } })
-const mode = defineModel('mode', { type: String, default: 'both' })
-const emit = defineEmits(['start'])
+defineProps<{ duration: number }>()
+const mode = defineModel<LootMode>('mode', { default: 'both' })
+const emit = defineEmits<{ start: [] }>()
 </script>
 
 <template>

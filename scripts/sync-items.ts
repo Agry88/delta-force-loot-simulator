@@ -9,11 +9,27 @@ const API = 'https://api.deltaforceapi.com/deltaforceapi.gateway.ApiService/'
 const OUT = new URL('../src/data/catalog.json', import.meta.url)
 const CONCURRENCY = 6
 
+interface ApiItem {
+  id: string
+  name: string
+  type?: string
+  typeSub?: string
+  quality: number
+  width: number
+  height: number
+  auctionable?: boolean
+  iconUrl?: string
+}
+
+interface ApiPrice {
+  price?: { price?: number; referencePrice?: number }
+}
+
 // Items bigger than the largest container (7x4) could never be placed.
 const MAX_W = 7
 const MAX_H = 4
 
-function loadKey() {
+function loadKey(): string | undefined {
   if (process.env.DFAPI_KEY) return process.env.DFAPI_KEY
   try {
     const env = readFileSync(new URL('../.env', import.meta.url), 'utf8')
@@ -27,26 +43,26 @@ if (!KEY) {
   process.exit(1)
 }
 
-async function call(method, body, tries = 4) {
+async function call<T>(method: string, body: object, tries = 4): Promise<T> {
   const res = await fetch(API + method, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1', 'deltaforceapi-gateway-key': KEY },
     body: JSON.stringify(body),
   })
-  if (res.ok) return res.json()
+  if (res.ok) return res.json() as Promise<T>
   if (tries > 1 && (res.status === 429 || res.status >= 500)) {
     await new Promise((r) => setTimeout(r, 1000 * 2 ** (4 - tries)))
-    return call(method, body, tries - 1)
+    return call<T>(method, body, tries - 1)
   }
-  const err = await res.json().catch(() => ({}))
+  const err = (await res.json().catch(() => ({}))) as { message?: string }
   throw new Error(`${method} ${res.status}: ${err.message ?? res.statusText}`)
 }
 
-async function listItems() {
-  const items = []
-  let pageToken
+async function listItems(): Promise<ApiItem[]> {
+  const items: ApiItem[] = []
+  let pageToken: string | null | undefined
   do {
-    const page = await call('ListItems', { pageSize: 1000, ...(pageToken && { pageToken }) })
+    const page = await call<{ items?: ApiItem[]; nextPageToken?: string }>('ListItems', { pageSize: 1000, ...(pageToken && { pageToken }) })
     items.push(...(page.items ?? []))
     pageToken = page.items?.length ? page.nextPageToken : null
   } while (pageToken)
@@ -54,15 +70,15 @@ async function listItems() {
 }
 
 // Runs fn over items with a small worker pool, keeping the API load gentle.
-async function mapPool(items, fn) {
-  const out = new Array(items.length)
+async function mapPool<T extends { name: string }, R>(items: T[], fn: (item: T) => Promise<R>): Promise<(R | null)[]> {
+  const out = new Array<R | null>(items.length)
   let next = 0
   let done = 0
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
       while (next < items.length) {
         const i = next++
-        out[i] = await fn(items[i]).catch((e) => (console.warn(`\n${items[i].name}: ${e.message}`), null))
+        out[i] = await fn(items[i]).catch((e: Error) => (console.warn(`\n${items[i].name}: ${e.message}`), null))
         process.stdout.write(`\rprices ${++done}/${items.length}`)
       }
     }),
@@ -71,7 +87,7 @@ async function mapPool(items, fn) {
   return out
 }
 
-const strip = (s, prefix) => s?.replace(prefix, '')
+const strip = (s: string | undefined, prefix: string) => s?.replace(prefix, '')
 
 const all = await listItems()
 console.log(`items ${all.length}`)
@@ -81,7 +97,7 @@ const candidates = all
   .map((it) => ({ ...it, w: it.height, h: it.width }))
   .filter((it) => it.auctionable && it.iconUrl && it.w > 0 && it.h > 0 && it.w <= MAX_W && it.h <= MAX_H)
 
-const prices = await mapPool(candidates, (it) => call('GetItemAuctionPrice', { itemId: it.id }))
+const prices = await mapPool(candidates, (it) => call<ApiPrice>('GetItemAuctionPrice', { itemId: it.id }))
 
 const catalog = candidates
   .map((it, i) => ({

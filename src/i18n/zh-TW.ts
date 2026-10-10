@@ -1,3 +1,5 @@
+import type { Messages } from './index.ts'
+
 export default {
   ui: {
     'start.title': '戰利品模擬器',
@@ -102,4 +104,4 @@ export default {
     'Duffel Bag': '旅行袋',
     Safe: '保險櫃',
   },
-}
+} satisfies Messages

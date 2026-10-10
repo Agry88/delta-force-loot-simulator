@@ -1,18 +1,19 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
-import { RARITIES } from '../data/items.js'
-import { formatValue } from '../lib/format.js'
-import { t, tn } from '../i18n/index.js'
+import { RARITIES } from '../data/items.ts'
+import { formatValue } from '../lib/format.ts'
+import { t, tn } from '../i18n/index.ts'
+import type { RaidResult, Rarity } from '../types.ts'
 
-const props = defineProps({ result: { type: Object, required: true } })
-const emit = defineEmits(['restart'])
+const props = defineProps<{ result: RaidResult }>()
+const emit = defineEmits<{ restart: [] }>()
 
 const items = computed(() => [...props.result.items].sort((a, b) => b.value - a.value))
 const total = computed(() => items.value.reduce((s, it) => s + it.value, 0))
 const best = computed(() => items.value[0])
 const byRarity = computed(() =>
-  Object.keys(RARITIES)
-    .map((r) => ({ rarity: Number(r), count: items.value.filter((it) => it.rarity === Number(r)).length }))
+  (Object.keys(RARITIES).map(Number) as Rarity[])
+    .map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length }))
     .filter((x) => x.count),
 )
 </script>

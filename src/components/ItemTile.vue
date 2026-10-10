@@ -1,17 +1,17 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
-import { SEARCH_TIME } from '../data/items.js'
-import { formatShort } from '../lib/format.js'
-import { hideTooltip, showTooltip } from '../lib/tooltip.js'
-import { tn } from '../i18n/index.js'
+import { SEARCH_TIME } from '../data/items.ts'
+import { formatShort } from '../lib/format.ts'
+import { hideTooltip, showTooltip } from '../lib/tooltip.ts'
+import { tn } from '../i18n/index.ts'
+import type { Item } from '../types.ts'
 
 // mode 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
-const props = defineProps({
-  item: { type: Object, required: true },
-  mode: { type: String, default: 'grid' },
-  locked: { type: Boolean, default: false },
+const props = withDefaults(defineProps<{ item: Item; mode?: 'grid' | 'slot'; locked?: boolean }>(), {
+  mode: 'grid',
+  locked: false,
 })
-const emit = defineEmits(['grab'])
+const emit = defineEmits<{ grab: [gx: number, gy: number] }>()
 
 const max = computed(() => props.item.def.dur ?? props.item.def.mag)
 const corner = computed(() => {
@@ -19,17 +19,18 @@ const corner = computed(() => {
   return formatShort(props.item.value)
 })
 
-function onDragStart(e) {
+function onDragStart(e: DragEvent) {
   if (!props.item.revealed || props.locked) return e.preventDefault()
   hideTooltip()
-  const r = e.currentTarget.getBoundingClientRect()
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  if (!e.dataTransfer) return
   e.dataTransfer.setData('text/plain', String(props.item.uid))
   e.dataTransfer.effectAllowed = 'move'
   // Which cell of the item was grabbed, so a drop lines up under the cursor.
   emit('grab', Math.floor(((e.clientX - r.left) / r.width) * props.item.def.w), Math.floor(((e.clientY - r.top) / r.height) * props.item.def.h))
 }
 
-function onHover(e) {
+function onHover(e: MouseEvent) {
   if (props.item.revealed) showTooltip(props.item, e)
 }
 </script>

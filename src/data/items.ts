@@ -1,7 +1,10 @@
-import { randomSpot } from '../lib/grid.js'
+import { randomSpot } from '../lib/grid.ts'
+import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, Player, Rarity, SlotStorage, SlotType } from '../types.ts'
 import catalog from './catalog.json'
 
-export const RARITIES = {
+type CatalogEntry = (typeof catalog.items)[number]
+
+export const RARITIES: Record<Rarity, string> = {
   1: 'Common',
   2: 'Uncommon',
   3: 'Rare',
@@ -11,19 +14,19 @@ export const RARITIES = {
 }
 
 // How likely each rarity is to drop, before container modifiers.
-const RARITY_WEIGHT = { 1: 40, 2: 28, 3: 17, 4: 9, 5: 4.5, 6: 1.5 }
+const RARITY_WEIGHT: Record<Rarity, number> = { 1: 40, 2: 28, 3: 17, 4: 9, 5: 4.5, 6: 1.5 }
 
 // Seconds it takes to search (reveal) one item of each rarity.
-export const SEARCH_TIME = { 1: 0.5, 2: 0.7, 3: 0.9, 4: 1.2, 5: 1.6, 6: 2.0 }
+export const SEARCH_TIME: Record<Rarity, number> = { 1: 0.5, 2: 0.7, 3: 0.9, 4: 1.2, 5: 1.6, 6: 2.0 }
 
 // Real items, prices and icons snapshotted from deltaforceapi.com by `pnpm sync-items`.
 // Each entry: { id, name, type, sub, quality, w, h, price } with w/h in grid cells.
-const ICON_URL = (id) => `https://cdn.deltaforceapi.com/deltaforceapi/item/${id}/icon.png`
+const ICON_URL = (id: string) => `https://cdn.deltaforceapi.com/deltaforceapi/item/${id}/icon.png`
 
 // Weapons have no quality in the API, so their rarity comes from price.
-const WEAPON_RARITY_PRICE = [[15000, 1], [40000, 2], [100000, 3], [200000, 4], [500000, 5]]
+const WEAPON_RARITY_PRICE: [number, Rarity][] = [[15000, 1], [40000, 2], [100000, 3], [200000, 4], [500000, 5]]
 
-const MAG_SIZE = {
+const MAG_SIZE: Record<string, number> = {
   WEAPON_ASSAULT_RIFLE: 30,
   WEAPON_SMG: 30,
   WEAPON_LMG: 100,
@@ -34,23 +37,23 @@ const MAG_SIZE = {
 }
 
 // Max durability of helmets and body armor by rarity.
-const DURABILITY = { 1: 20, 2: 25, 3: 38, 4: 50, 5: 61, 6: 75 }
+const DURABILITY: Record<Rarity, number> = { 1: 20, 2: 25, 3: 38, 4: 50, 5: 61, 6: 75 }
 
-const CATEGORY_BY_SUB = {
+const CATEGORY_BY_SUB: Record<string, Category> = {
   COLLECTIBLE_MEDICAL_ITEM: 'med',
   COLLECTIBLE_ELECTRONIC_PRODUCT: 'tech',
   COLLECTIBLE_CRAFTWORK: 'valuable',
   CONSUMABLE_ARMOR_REP: 'misc',
 }
-const CATEGORY_BY_TYPE = { WEAPON: 'weapon', WEAPON_PART: 'part', GEAR: 'gear', AMMO: 'ammo', CONSUMABLE: 'med', KEYCARD: 'valuable' }
+const CATEGORY_BY_TYPE: Record<string, Category> = { WEAPON: 'weapon', WEAPON_PART: 'part', GEAR: 'gear', AMMO: 'ammo', CONSUMABLE: 'med', KEYCARD: 'valuable' }
 
-const SLOT_BY_SUB = { WEAPON_PISTOL: 'pistol', GEAR_HELMET: 'helmet', GEAR_VEST: 'armor' }
+const SLOT_BY_SUB: Record<string, SlotType> = { WEAPON_PISTOL: 'pistol', GEAR_HELMET: 'helmet', GEAR_VEST: 'armor' }
 
-function toDef(it) {
-  const rarity =
+function toDef(it: CatalogEntry): ItemDef {
+  const rarity: Rarity =
     it.type === 'WEAPON'
       ? (WEAPON_RARITY_PRICE.find(([max]) => it.price < max)?.[1] ?? 6)
-      : Math.min(6, Math.max(1, it.quality))
+      : (Math.min(6, Math.max(1, it.quality)) as Rarity)
   const slot = SLOT_BY_SUB[it.sub] ?? (it.type === 'WEAPON' ? 'weapon' : undefined)
   return {
     name: it.name,
@@ -70,18 +73,22 @@ function toDef(it) {
 // slot: which equipment slot the item can be equipped in.
 // dur: max durability (helmets/armor); mag: magazine size (guns).
 // The API has no melee weapons, so the knife stays hand-made.
-export const CATALOG = [
+export const CATALOG: ItemDef[] = [
   ...catalog.items.map(toDef),
   { name: 'Combat Knife', icon: '🔪', cat: 'weapon', slot: 'melee', rarity: 1, w: 2, h: 1, value: 1500 },
 ]
 
 // Weapon parts outnumber everything else in the API, so they drop less often per item.
-const CATEGORY_WEIGHT = { part: 0.3 }
+const CATEGORY_WEIGHT: Partial<Record<Category, number>> = { part: 0.3 }
 
-const byName = (name) => CATALOG.find((d) => d.name === name)
+function byName(name: string): ItemDef {
+  const def = CATALOG.find((d) => d.name === name)
+  if (!def) throw new Error(`Unknown item: ${name}`)
+  return def
+}
 
 // Equipment slots, shared by the player and enemy bodies.
-const SLOTS = [
+const SLOTS: Pick<SlotStorage, 'id' | 'name' | 'accepts' | 'label' | 'wide'>[] = [
   { id: 'weapon1', name: 'Primary Weapon', accepts: 'weapon', label: '1', wide: true },
   { id: 'weapon2', name: 'Secondary Weapon', accepts: 'weapon', label: '2', wide: true },
   { id: 'helmet', name: 'Helmet', accepts: 'helmet' },
@@ -91,23 +98,37 @@ const SLOTS = [
 ]
 
 // Chance an enemy body has something in each slot.
-const BODY_SLOT_CHANCE = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, pistol: 0.45, melee: 0.5 }
+const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, pistol: 0.45, melee: 0.5 }
 
-// luck multiplies the weight of Epic and better items.
-const CRATE_TYPES = [
+interface PickOptions {
+  prefer?: Category[]
+  // Multiplies the weight of Epic and better items.
+  luck?: number
+  slot?: SlotType | null
+}
+
+interface CrateType extends PickOptions {
+  name: string
+  icon: string
+  w: number
+  h: number
+  count: [number, number]
+}
+
+const CRATE_TYPES: CrateType[] = [
   { name: 'Weapon Case', icon: '🧳', w: 7, h: 4, count: [3, 6], prefer: ['weapon', 'ammo', 'part'], luck: 1.3 },
   { name: 'Medical Crate', icon: '🧰', w: 6, h: 4, count: [4, 8], prefer: ['med'], luck: 1 },
   { name: 'Duffel Bag', icon: '👜', w: 6, h: 5, count: [5, 9], prefer: ['misc', 'tech'], luck: 1 },
   { name: 'Safe', icon: '🗃️', w: 4, h: 4, count: [3, 5], prefer: ['valuable'], luck: 3 },
 ]
 
-const perRarity = CATALOG.reduce((acc, d) => ((acc[d.rarity] = (acc[d.rarity] || 0) + 1), acc), {})
+const perRarity = CATALOG.reduce<Partial<Record<Rarity, number>>>((acc, d) => ((acc[d.rarity] = (acc[d.rarity] || 0) + 1), acc), {})
 
 let nextUid = 1
 
-const randInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1))
+const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1))
 
-function pickWeighted(entries) {
+function pickWeighted<T>(entries: [T, number][]): T {
   const total = entries.reduce((s, [, w]) => s + w, 0)
   let r = Math.random() * total
   for (const [value, w] of entries) {
@@ -116,19 +137,27 @@ function pickWeighted(entries) {
   return entries[entries.length - 1][0]
 }
 
-function pickItem({ prefer = [], luck = 1, slot = null } = {}) {
+function pickItem({ prefer = [], luck = 1, slot = null }: PickOptions = {}): ItemDef {
   return pickWeighted(
     CATALOG.filter((def) => !slot || def.slot === slot).map((def) => {
-      let w = RARITY_WEIGHT[def.rarity] / perRarity[def.rarity]
+      let w = RARITY_WEIGHT[def.rarity] / perRarity[def.rarity]!
       if (def.rarity >= 4) w *= luck
       if (prefer.includes(def.cat)) w *= 3
       w *= CATEGORY_WEIGHT[def.cat] ?? 1
-      return [def, w]
+      return [def, w] as [ItemDef, number]
     }),
   )
 }
 
-function makeItem(def, { x = 0, y = 0, revealed = false, owned = false, cond } = {}) {
+interface MakeItemOptions {
+  x?: number
+  y?: number
+  revealed?: boolean
+  owned?: boolean
+  cond?: number
+}
+
+function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false, cond }: MakeItemOptions = {}): Item {
   const max = def.dur ?? def.mag
   return {
     uid: nextUid++,
@@ -144,15 +173,15 @@ function makeItem(def, { x = 0, y = 0, revealed = false, owned = false, cond } =
   }
 }
 
-function makeSlots(owner) {
+function makeSlots(owner: Owner): SlotStorage[] {
   return SLOTS.map((s) => ({ ...s, kind: 'slot', owner, items: [] }))
 }
 
-function makeGrid(owner, id, name, w, h, icon = null) {
+function makeGrid(owner: Owner, id: string, name: string, w: number, h: number, icon: string | null = null): GridStorage {
   return { kind: 'grid', owner, id, name, w, h, icon, items: [] }
 }
 
-function fillGrid(grid, count, opts) {
+function fillGrid(grid: GridStorage, count: number, opts: PickOptions) {
   for (let attempt = 0; attempt < count * 4 && grid.items.length < count; attempt++) {
     const def = pickItem(opts)
     const spot = randomSpot(grid, def)
@@ -160,15 +189,16 @@ function fillGrid(grid, count, opts) {
   }
 }
 
-export function createPlayer() {
+export function createPlayer(): Player {
   const slots = makeSlots('player')
-  const equip = (id, name, cond) => slots.find((s) => s.id === id).items.push(makeItem(byName(name), { revealed: true, owned: true, cond }))
+  const slot = (id: string) => slots.find((s) => s.id === id)!
+  const equip = (id: string, name: string, cond?: number) => slot(id).items.push(makeItem(byName(name), { revealed: true, owned: true, cond }))
   equip('weapon1', 'AUG Assault Rifle', 30)
   equip('weapon2', 'M1014 Shotgun', 6)
   equip('helmet', 'H07 Tactical Helmet', 29)
   equip('armor', 'Light Vest', 0)
   equip('melee', 'Combat Knife')
-  slots.find((s) => s.id === 'melee').locked = true
+  slot('melee').locked = true
 
   return {
     slots,
@@ -181,7 +211,7 @@ export function createPlayer() {
   }
 }
 
-function createBody() {
+function createBody(): LootContainer {
   const slots = makeSlots('loot')
   for (const slot of slots) {
     if (Math.random() < BODY_SLOT_CHANCE[slot.id]) {
@@ -199,17 +229,16 @@ function createBody() {
   return { name: 'Enemy Operator', slots, grids }
 }
 
-function createCrate() {
+function createCrate(): LootContainer {
   const type = CRATE_TYPES[randInt(0, CRATE_TYPES.length - 1)]
   const grid = makeGrid('loot', 'crate', type.name, type.w, type.h, type.icon)
   fillGrid(grid, randInt(...type.count), type)
   return { name: type.name, slots: [], grids: [grid] }
 }
 
-// What a raid can turn up: 'crate', 'body', or 'both'.
-export const LOOT_MODES = ['both', 'crate', 'body']
+export const LOOT_MODES: LootMode[] = ['both', 'crate', 'body']
 
-export function createLootContainer(mode = 'both') {
+export function createLootContainer(mode: LootMode = 'both'): LootContainer {
   if (mode === 'crate') return createCrate()
   if (mode === 'body') return createBody()
   return Math.random() < 0.4 ? createBody() : createCrate()

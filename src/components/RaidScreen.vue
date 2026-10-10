@@ -1,20 +1,18 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import OperatorFigure from './OperatorFigure.vue'
 import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
-import { createLootContainer, createPlayer, RARITIES, SEARCH_TIME } from '../data/items.js'
-import { findSpot, fits } from '../lib/grid.js'
-import { formatClock, formatValue } from '../lib/format.js'
-import { hideTooltip, tooltip } from '../lib/tooltip.js'
-import { t, tn } from '../i18n/index.js'
+import { createLootContainer, createPlayer, RARITIES, SEARCH_TIME } from '../data/items.ts'
+import { findSpot, fits } from '../lib/grid.ts'
+import { formatClock, formatValue } from '../lib/format.ts'
+import { hideTooltip, tooltip } from '../lib/tooltip.ts'
+import { t, tn } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
+import type { Item, LootMode, RaidResult, Storage } from '../types.ts'
 
-const props = defineProps({
-  duration: { type: Number, required: true },
-  mode: { type: String, default: 'both' },
-})
-const emit = defineEmits(['finish'])
+const props = withDefaults(defineProps<{ duration: number; mode?: LootMode }>(), { mode: 'both' })
+const emit = defineEmits<{ finish: [result: RaidResult] }>()
 
 const player = reactive(createPlayer())
 const loot = ref(createLootContainer(props.mode))
@@ -22,9 +20,9 @@ const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
-const playerStorages = computed(() => [...player.slots, ...player.grids])
-const playerSlot = (id) => player.slots.find((s) => s.id === id)
-const lootSlot = (id) => loot.value.slots.find((s) => s.id === id)
+const playerStorages = computed<Storage[]>(() => [...player.slots, ...player.grids])
+const playerSlot = (id: string) => player.slots.find((s) => s.id === id)!
+const lootSlot = (id: string) => loot.value.slots.find((s) => s.id === id)!
 
 // Gear you spawned with doesn't count as loot.
 const earnings = computed(() =>
@@ -60,7 +58,7 @@ function finish() {
   })
 }
 
-function onKey(e) {
+function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') finish()
 }
 
@@ -80,7 +78,7 @@ onBeforeUnmount(() => {
 // --- searching: reveal loot one item at a time ------------------------------
 
 let searchToken = 0
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function runSearch() {
   const token = ++searchToken
@@ -104,13 +102,13 @@ function nextContainer() {
 // --- moving items --------------------------------------------------------------
 
 let toastTimer = 0
-function flash(msg) {
+function flash(msg: string) {
   toast.value = msg
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1200)
 }
 
-function moveItem(item, from, to, x, y) {
+function moveItem(item: Item, from: Storage, to: Storage, x: number, y: number) {
   hideTooltip()
   from.items.splice(from.items.indexOf(item), 1)
   item.x = x
@@ -118,21 +116,21 @@ function moveItem(item, from, to, x, y) {
   to.items.push(item)
 }
 
-function quickMove(item, from) {
-  if (!item.revealed || from.locked) return
-  const targets =
+function quickMove(item: Item, from: Storage) {
+  if (!item.revealed || (from.kind === 'slot' && from.locked)) return
+  const targets: Storage[] =
     from.owner === 'loot'
       ? [...(item.def.slot ? player.slots : []), ...player.grids]
       : [...loot.value.grids, ...loot.value.slots]
-  for (const t of targets) {
-    const spot = findSpot(t, item.def)
-    if (spot) return moveItem(item, from, t, spot.x, spot.y)
+  for (const target of targets) {
+    const spot = findSpot(target, item.def)
+    if (spot) return moveItem(item, from, target, spot.x, spot.y)
   }
   flash(t('raid.noSpace'))
 }
 
-let drag = null
-function onDrop(target, cx, cy) {
+let drag: { item: Item; from: Storage; gx: number; gy: number } | null = null
+function onDrop(target: Storage, cx: number, cy: number) {
   if (!drag) return
   const { item, from, gx, gy } = drag
   drag = null
@@ -144,11 +142,11 @@ function onDrop(target, cx, cy) {
 }
 
 // Event handlers for one storage (grid or slot), spread onto its component.
-function on(storage) {
+function on(storage: Storage) {
   return {
-    'item-click': (item) => quickMove(item, storage),
-    'drag-start': (item, gx, gy) => (drag = { item, from: storage, gx, gy }),
-    'drop-at': (cx, cy) => onDrop(storage, cx, cy),
+    'item-click': (item: Item) => quickMove(item, storage),
+    'drag-start': (item: Item, gx: number, gy: number) => (drag = { item, from: storage, gx, gy }),
+    'drop-at': (cx: number, cy: number) => onDrop(storage, cx, cy),
   }
 }
 
