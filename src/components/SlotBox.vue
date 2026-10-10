@@ -1,11 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import ItemTile from './ItemTile.vue'
+import { tn } from '../i18n/index.ts'
+import type { Item, SlotStorage, SlotType } from '../domain/models.ts'
 
-const PLACEHOLDER = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
+const PLACEHOLDER: Record<SlotType, string> = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
 
-const props = defineProps({ slot: { type: Object, required: true } })
-const emit = defineEmits(['item-click', 'drag-start', 'drop-at'])
+interface Props {
+  slot: SlotStorage
+}
+
+interface Emits {
+  'item-click': [item: Item]
+  'drag-start': [item: Item, gx: number, gy: number]
+  'drop-at': [cx: number, cy: number]
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
 
 const item = computed(() => props.slot.items[0])
 </script>
@@ -14,7 +26,7 @@ const item = computed(() => props.slot.items[0])
   <div
     class="slot"
     :class="{ wide: slot.wide, locked: slot.locked, labelled: slot.label }"
-    :title="item ? '' : slot.name"
+    :title="item ? '' : tn(slot.name)"
     @dragover.prevent
     @drop.prevent="emit('drop-at', 0, 0)"
   >

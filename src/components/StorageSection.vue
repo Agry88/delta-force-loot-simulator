@@ -1,19 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import GridContainer from './GridContainer.vue'
-import { usedCells } from '../lib/grid.js'
+import { usedCells } from '../domain/grid.ts'
+import { t, tn } from '../i18n/index.ts'
+import type { GridStorage } from '../domain/models.ts'
 
 defineOptions({ inheritAttrs: false })
-defineProps({
-  grid: { type: Object, required: true },
-  note: { type: String, default: '' },
-})
+interface Props {
+  grid: GridStorage
+  note?: string
+}
+
+withDefaults(defineProps<Props>(), { note: '' })
 </script>
 
 <template>
   <div class="storage">
     <div class="head">
-      <span>{{ grid.name }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
-      <span class="q" :title="note || `${grid.w}×${grid.h} storage`">?</span>
+      <span>{{ tn(grid.name) }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
+      <span class="q" :title="note || t('storage.size', { w: grid.w, h: grid.h })">?</span>
       <em v-if="note">{{ note }}</em>
     </div>
     <div class="body">

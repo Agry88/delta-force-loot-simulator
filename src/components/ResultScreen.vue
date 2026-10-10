@@ -1,60 +1,70 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
-import { RARITIES } from '../data/items.js'
-import { formatValue } from '../lib/format.js'
+import { RARITIES, RARITY_LIST } from '../domain/rarity.ts'
+import { formatValue } from '../lib/format.ts'
+import { t, tn } from '../i18n/index.ts'
+import type { RaidResult } from '../domain/models.ts'
 
-const props = defineProps({ result: { type: Object, required: true } })
-const emit = defineEmits(['restart'])
+interface Props {
+  result: RaidResult
+}
+
+interface Emits {
+  restart: []
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
 
 const items = computed(() => [...props.result.items].sort((a, b) => b.value - a.value))
 const total = computed(() => items.value.reduce((s, it) => s + it.value, 0))
 const best = computed(() => items.value[0])
 const byRarity = computed(() =>
-  Object.keys(RARITIES)
-    .map((r) => ({ rarity: Number(r), count: items.value.filter((it) => it.rarity === Number(r)).length }))
-    .filter((x) => x.count),
+  RARITY_LIST.map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length })).filter((x) => x.count),
 )
 </script>
 
 <template>
   <div class="result">
-    <h1>EXTRACTION SUCCESSFUL</h1>
+    <h1>{{ t('result.title') }}</h1>
 
     <div class="summary">
       <div class="big">
-        <span class="label">Total Value</span>
+        <span class="label">{{ t('result.total') }}</span>
         <b>{{ formatValue(total) }}</b>
       </div>
-      <div><span class="label">Items</span><b>{{ items.length }}</b></div>
-      <div><span class="label">Containers</span><b>{{ result.containersOpened }}</b></div>
+      <div><span class="label">{{ t('result.items') }}</span><b>{{ items.length }}</b></div>
+      <div><span class="label">{{ t('result.containers') }}</span><b>{{ result.containersOpened }}</b></div>
     </div>
 
     <div v-if="best" class="best" :class="`r${best.rarity}`">
-      <span class="icon">{{ best.icon }}</span>
+      <img v-if="best.img" class="icon" :src="best.img" alt="" />
+      <span v-else class="icon">{{ best.icon }}</span>
       <div>
-        <div class="label">Best find · {{ RARITIES[best.rarity] }}</div>
-        <div class="best-name">{{ best.name }}</div>
+        <div class="label">{{ t('result.best') }} · {{ tn(RARITIES[best.rarity]) }}</div>
+        <div class="best-name">{{ tn(best.name) }}</div>
         <div>{{ formatValue(best.value) }}</div>
       </div>
     </div>
 
     <div v-if="byRarity.length" class="rarities">
       <span v-for="r in byRarity" :key="r.rarity" class="chip" :class="`r${r.rarity}`">
-        {{ RARITIES[r.rarity] }} × {{ r.count }}
+        {{ tn(RARITIES[r.rarity]) }} × {{ r.count }}
       </span>
     </div>
 
     <ul v-if="items.length" class="list">
       <li v-for="(it, i) in items" :key="i" :class="`r${it.rarity}`">
-        <span class="icon">{{ it.icon }}</span>
-        <span class="name">{{ it.name }}</span>
-        <span class="where">{{ it.where }}</span>
+        <img v-if="it.img" class="icon" :src="it.img" alt="" loading="lazy" />
+        <span v-else class="icon">{{ it.icon }}</span>
+        <span class="name">{{ tn(it.name) }}</span>
+        <span class="where">{{ tn(it.where) }}</span>
         <span class="val">{{ formatValue(it.value) }}</span>
       </li>
     </ul>
-    <p v-else class="empty">You walked out empty-handed. Grab something next time!</p>
+    <p v-else class="empty">{{ t('result.empty') }}</p>
 
-    <button class="btn-again" @click="emit('restart')">RAID AGAIN</button>
+    <button class="btn-again" @click="emit('restart')">{{ t('result.again') }}</button>
   </div>
 </template>
 
@@ -111,6 +121,11 @@ h1 {
 .best .icon {
   font-size: 52px;
 }
+.best img.icon {
+  width: 96px;
+  height: 64px;
+  object-fit: contain;
+}
 .best-name {
   font-size: 22px;
   font-weight: 700;
@@ -149,6 +164,11 @@ h1 {
 }
 .list .icon {
   font-size: 22px;
+}
+.list img.icon {
+  width: 36px;
+  height: 24px;
+  object-fit: contain;
 }
 .list .name {
   color: var(--text-strong);

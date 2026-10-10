@@ -1,16 +1,28 @@
-<script setup>
-import { computed } from 'vue'
-import { SEARCH_TIME } from '../data/items.js'
-import { formatShort } from '../lib/format.js'
-import { hideTooltip, showTooltip } from '../lib/tooltip.js'
+<script setup lang="ts">
+import { computed, useTemplateRef } from 'vue'
+import { SEARCH_TIME } from '../domain/rarity.ts'
+import { formatShort } from '../lib/format.ts'
+import { hideTooltip, showTooltip } from '../lib/tooltip.ts'
+import { tn } from '../i18n/index.ts'
+import type { Item } from '../domain/models.ts'
 
-// mode 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
-const props = defineProps({
-  item: { type: Object, required: true },
-  mode: { type: String, default: 'grid' },
-  locked: { type: Boolean, default: false },
+interface Props {
+  item: Item
+  // 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
+  mode?: 'grid' | 'slot'
+  locked?: boolean
+}
+
+interface Emits {
+  grab: [gx: number, gy: number]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'grid',
+  locked: false,
 })
-const emit = defineEmits(['grab'])
+const emit = defineEmits<Emits>()
+const tile = useTemplateRef('tile')
 
 const max = computed(() => props.item.def.dur ?? props.item.def.mag)
 const corner = computed(() => {
@@ -18,23 +30,25 @@ const corner = computed(() => {
   return formatShort(props.item.value)
 })
 
-function onDragStart(e) {
+function onDragStart(e: DragEvent) {
   if (!props.item.revealed || props.locked) return e.preventDefault()
   hideTooltip()
-  const r = e.currentTarget.getBoundingClientRect()
+  if (!tile.value || !e.dataTransfer) return
+  const r = tile.value.getBoundingClientRect()
   e.dataTransfer.setData('text/plain', String(props.item.uid))
   e.dataTransfer.effectAllowed = 'move'
   // Which cell of the item was grabbed, so a drop lines up under the cursor.
   emit('grab', Math.floor(((e.clientX - r.left) / r.width) * props.item.def.w), Math.floor(((e.clientY - r.top) / r.height) * props.item.def.h))
 }
 
-function onHover(e) {
+function onHover(e: MouseEvent) {
   if (props.item.revealed) showTooltip(props.item, e)
 }
 </script>
 
 <template>
   <div
+    ref="tile"
     class="tile"
     :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked }]"
     :draggable="item.revealed && !locked"
@@ -44,8 +58,9 @@ function onHover(e) {
     @mouseleave="hideTooltip"
   >
     <template v-if="item.revealed">
-      <span class="name">{{ item.def.name }}</span>
-      <span class="icon">{{ item.def.icon }}</span>
+      <span class="name">{{ tn(item.def.name) }}</span>
+      <img v-if="item.def.img" class="img" :src="item.def.img" alt="" draggable="false" loading="lazy" />
+      <span v-else class="icon">{{ item.def.icon }}</span>
       <span class="corner" :class="{ empty: max && mode === 'slot' && item.cond === 0 }">{{ corner }}</span>
     </template>
     <template v-else-if="item.searching">
@@ -111,6 +126,15 @@ function onHover(e) {
   place-items: center;
   font-size: calc(var(--cell) * 0.42);
   filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.6));
+}
+.img {
+  position: absolute;
+  inset: 14px 4px 14px;
+  width: calc(100% - 8px);
+  height: calc(100% - 28px);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.6));
+  pointer-events: none;
 }
 .slot .icon {
   font-size: 38px;
