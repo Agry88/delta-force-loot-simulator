@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import ItemTile from './ItemTile.vue'
 import { tn } from '../i18n/index.ts'
-import type { Item, SlotStorage, SlotType } from '../types.ts'
+import type { Item, SlotStorage, SlotType } from '../domain/models.ts'
 
 const PLACEHOLDER: Record<SlotType, string> = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
 

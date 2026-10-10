@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RARITIES } from '../data/items.ts'
+import { RARITIES } from '../domain/rarity.ts'
 import { formatValue } from '../lib/format.ts'
 import { t, tn } from '../i18n/index.ts'
-import type { RaidResult, Rarity } from '../types.ts'
+import type { RaidResult, Rarity } from '../domain/models.ts'
 
 const props = defineProps<{ result: RaidResult }>()
 const emit = defineEmits<{ restart: [] }>()

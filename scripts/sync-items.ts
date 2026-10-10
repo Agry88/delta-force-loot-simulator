@@ -1,12 +1,12 @@
 // Snapshots item names, sizes and auction prices from deltaforceapi.com into
-// src/data/catalog.json, so the game never calls the API at runtime.
+// src/data/itemRepository/catalog.json, so the game never calls the API at runtime.
 //
 //   DFAPI_KEY=... pnpm sync-items      (or put DFAPI_KEY in .env)
 
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const API = 'https://api.deltaforceapi.com/deltaforceapi.gateway.ApiService/'
-const OUT = new URL('../src/data/catalog.json', import.meta.url)
+const OUT = new URL('../src/data/itemRepository/catalog.json', import.meta.url)
 const CONCURRENCY = 6
 
 interface ApiItem {
@@ -114,4 +114,4 @@ const catalog = candidates
   .sort((a, b) => a.name.localeCompare(b.name))
 
 writeFileSync(OUT, JSON.stringify({ syncedAt: new Date().toISOString(), items: catalog }, null, 0).replace(/\},\{/g, '},\n{') + '\n')
-console.log(`wrote ${catalog.length} priced items to src/data/catalog.json`)
+console.log(`wrote ${catalog.length} priced items to src/data/itemRepository/catalog.json`)

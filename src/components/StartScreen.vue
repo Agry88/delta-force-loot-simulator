@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { LOOT_MODES } from '../data/items.ts'
+import { LOOT_MODES } from '../domain/loot.ts'
 import { t } from '../i18n/index.ts'
-import type { LootMode } from '../types.ts'
+import type { LootMode } from '../domain/models.ts'
 
 defineProps<{ duration: number }>()
 const mode = defineModel<LootMode>('mode', { default: 'both' })

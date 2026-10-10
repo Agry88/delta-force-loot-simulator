@@ -4,7 +4,7 @@ import StartScreen from './components/StartScreen.vue'
 import RaidScreen from './components/RaidScreen.vue'
 import ResultScreen from './components/ResultScreen.vue'
 import LangToggle from './components/LangToggle.vue'
-import type { LootMode, RaidResult } from './types.ts'
+import type { LootMode, RaidResult } from './domain/models.ts'
 
 const RAID_SECONDS = 30
 

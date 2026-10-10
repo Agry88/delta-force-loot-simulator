@@ -2,7 +2,7 @@
 //   grid: { kind: 'grid', w, h, items } — items sit at x/y and take def.w × def.h cells
 //   slot: { kind: 'slot', accepts, locked?, items } — holds one item whose def.slot matches
 
-import type { GridStorage, Item, ItemDef, Storage } from '../types.ts'
+import type { GridStorage, Item, ItemDef, Storage } from './models.ts'
 
 type Spot = { x: number; y: number }
 

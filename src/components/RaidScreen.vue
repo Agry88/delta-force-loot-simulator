@@ -3,19 +3,21 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import OperatorFigure from './OperatorFigure.vue'
 import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
-import { createLootContainer, createPlayer, RARITIES, SEARCH_TIME } from '../data/items.ts'
-import { findSpot, fits } from '../lib/grid.ts'
+import { lootGenerator } from '../di.ts'
+import { findSpot, fits } from '../domain/grid.ts'
+import { carryWeight, lootValue, quickMoveTargets, raidResult } from '../domain/raid.ts'
+import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
 import { hideTooltip, tooltip } from '../lib/tooltip.ts'
 import { t, tn } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
-import type { Item, LootMode, RaidResult, Storage } from '../types.ts'
+import type { Item, LootMode, RaidResult, Storage } from '../domain/models.ts'
 
 const props = withDefaults(defineProps<{ duration: number; mode?: LootMode }>(), { mode: 'both' })
 const emit = defineEmits<{ finish: [result: RaidResult] }>()
 
-const player = reactive(createPlayer())
-const loot = ref(createLootContainer(props.mode))
+const player = reactive(lootGenerator.createPlayer())
+const loot = ref(lootGenerator.createLootContainer(props.mode))
 const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
@@ -24,13 +26,8 @@ const playerStorages = computed<Storage[]>(() => [...player.slots, ...player.gri
 const playerSlot = (id: string) => player.slots.find((s) => s.id === id)!
 const lootSlot = (id: string) => loot.value.slots.find((s) => s.id === id)!
 
-// Gear you spawned with doesn't count as loot.
-const earnings = computed(() =>
-  playerStorages.value.reduce((sum, s) => sum + s.items.reduce((t, it) => t + (it.owned ? 0 : it.value), 0), 0),
-)
-const weight = computed(
-  () => 9.5 + playerStorages.value.reduce((sum, s) => sum + s.items.reduce((t, it) => t + it.def.w * it.def.h * 0.55, 0), 0),
-)
+const earnings = computed(() => lootValue(playerStorages.value))
+const weight = computed(() => carryWeight(playerStorages.value))
 const searching = computed(() => loot.value.grids.some((g) => g.items.some((it) => !it.revealed)))
 
 // --- timer -----------------------------------------------------------------
@@ -50,12 +47,7 @@ function finish() {
   clearInterval(timerId)
   searchToken++
   hideTooltip()
-  emit('finish', {
-    items: playerStorages.value.flatMap((s) =>
-      s.items.filter((it) => !it.owned).map((it) => ({ ...it.def, value: it.value, where: s.name })),
-    ),
-    containersOpened: containersOpened.value,
-  })
+  emit('finish', raidResult(playerStorages.value, containersOpened.value))
 }
 
 function onKey(e: KeyboardEvent) {
@@ -94,7 +86,7 @@ async function runSearch() {
 
 function nextContainer() {
   hideTooltip()
-  loot.value = createLootContainer(props.mode)
+  loot.value = lootGenerator.createLootContainer(props.mode)
   containersOpened.value++
   runSearch()
 }
@@ -118,11 +110,7 @@ function moveItem(item: Item, from: Storage, to: Storage, x: number, y: number) 
 
 function quickMove(item: Item, from: Storage) {
   if (!item.revealed || (from.kind === 'slot' && from.locked)) return
-  const targets: Storage[] =
-    from.owner === 'loot'
-      ? [...(item.def.slot ? player.slots : []), ...player.grids]
-      : [...loot.value.grids, ...loot.value.slots]
-  for (const target of targets) {
+  for (const target of quickMoveTargets(item, from, player, loot.value)) {
     const spot = findSpot(target, item.def)
     if (spot) return moveItem(item, from, target, spot.x, spot.y)
   }

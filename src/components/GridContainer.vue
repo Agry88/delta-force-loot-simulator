@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ItemTile from './ItemTile.vue'
-import type { GridStorage, Item } from '../types.ts'
+import type { GridStorage, Item } from '../domain/models.ts'
 
 const props = defineProps<{ grid: GridStorage }>()
 const emit = defineEmits<{

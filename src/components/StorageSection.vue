@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import GridContainer from './GridContainer.vue'
-import { usedCells } from '../lib/grid.ts'
+import { usedCells } from '../domain/grid.ts'
 import { t, tn } from '../i18n/index.ts'
-import type { GridStorage } from '../types.ts'
+import type { GridStorage } from '../domain/models.ts'
 
 defineOptions({ inheritAttrs: false })
 withDefaults(defineProps<{ grid: GridStorage; note?: string }>(), { note: '' })

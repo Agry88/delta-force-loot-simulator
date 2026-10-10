@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import type { Item } from '../types.ts'
+import type { Item } from '../domain/models.ts'
 
 // The item currently hovered, shown in a floating tooltip by RaidScreen.
 export const tooltip = reactive<{ item: Item | null; x: number; y: number }>({ item: null, x: 0, y: 0 })

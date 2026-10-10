@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { SEARCH_TIME } from '../data/items.ts'
+import { SEARCH_TIME } from '../domain/rarity.ts'
 import { formatShort } from '../lib/format.ts'
 import { hideTooltip, showTooltip } from '../lib/tooltip.ts'
 import { tn } from '../i18n/index.ts'
-import type { Item } from '../types.ts'
+import type { Item } from '../domain/models.ts'
 
 // mode 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
 const props = withDefaults(defineProps<{ item: Item; mode?: 'grid' | 'slot'; locked?: boolean }>(), {

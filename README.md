@@ -6,7 +6,7 @@ Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://
 
 ## Item data
 
-Item names, grid sizes, auction prices and icons come from [deltaforceapi.com](https://deltaforceapi.com) and are snapshotted into `src/data/catalog.json`, so the game never calls the API at runtime. To refresh prices:
+Item names, grid sizes, auction prices and icons come from [deltaforceapi.com](https://deltaforceapi.com) and are snapshotted into `src/data/itemRepository/catalog.json`, so the game never calls the API at runtime. To refresh prices:
 
 ```sh
 echo 'DFAPI_KEY=sk_...' > .env   # a server-to-server key from deltaforceapi.com
