@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { SEARCH_TIME } from '../domain/rarity.ts'
 import { formatShort } from '../lib/format.ts'
 import { hideTooltip, showTooltip } from '../lib/tooltip.ts'
 import { tn } from '../i18n/index.ts'
 import type { Item } from '../domain/models.ts'
 
-// mode 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
-const props = withDefaults(defineProps<{ item: Item; mode?: 'grid' | 'slot'; locked?: boolean }>(), {
+interface Props {
+  item: Item
+  // 'grid' shows the price; 'slot' shows durability/ammo like an equipped item.
+  mode?: 'grid' | 'slot'
+  locked?: boolean
+}
+
+interface Emits {
+  grab: [gx: number, gy: number]
+}
+
+const props = withDefaults(defineProps<Props>(), {
   mode: 'grid',
   locked: false,
 })
-const emit = defineEmits<{ grab: [gx: number, gy: number] }>()
+const emit = defineEmits<Emits>()
+const tile = useTemplateRef('tile')
 
 const max = computed(() => props.item.def.dur ?? props.item.def.mag)
 const corner = computed(() => {
@@ -22,8 +33,8 @@ const corner = computed(() => {
 function onDragStart(e: DragEvent) {
   if (!props.item.revealed || props.locked) return e.preventDefault()
   hideTooltip()
-  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  if (!e.dataTransfer) return
+  if (!tile.value || !e.dataTransfer) return
+  const r = tile.value.getBoundingClientRect()
   e.dataTransfer.setData('text/plain', String(props.item.uid))
   e.dataTransfer.effectAllowed = 'move'
   // Which cell of the item was grabbed, so a drop lines up under the cursor.
@@ -37,6 +48,7 @@ function onHover(e: MouseEvent) {
 
 <template>
   <div
+    ref="tile"
     class="tile"
     :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked }]"
     :draggable="item.revealed && !locked"

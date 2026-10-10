@@ -6,12 +6,18 @@ import type { Item, SlotStorage, SlotType } from '../domain/models.ts'
 
 const PLACEHOLDER: Record<SlotType, string> = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
 
-const props = defineProps<{ slot: SlotStorage }>()
-const emit = defineEmits<{
+interface Props {
+  slot: SlotStorage
+}
+
+interface Emits {
   'item-click': [item: Item]
   'drag-start': [item: Item, gx: number, gy: number]
   'drop-at': [cx: number, cy: number]
-}>()
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
 
 const item = computed(() => props.slot.items[0])
 </script>

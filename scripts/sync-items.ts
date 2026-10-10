@@ -21,8 +21,33 @@ interface ApiItem {
   iconUrl?: string
 }
 
-interface ApiPrice {
-  price?: { price?: number; referencePrice?: number }
+// Response bodies are untrusted JSON, so read fields through these instead of asserting a shape.
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
+const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
+
+function parseItem(v: unknown): ApiItem | null {
+  if (!isRecord(v)) return null
+  const id = str(v.id)
+  const name = str(v.name)
+  if (!id || !name) return null
+  return {
+    id,
+    name,
+    type: str(v.type),
+    typeSub: str(v.typeSub),
+    quality: num(v.quality) ?? 0,
+    width: num(v.width) ?? 0,
+    height: num(v.height) ?? 0,
+    auctionable: v.auctionable === true,
+    iconUrl: str(v.iconUrl),
+  }
+}
+
+// GetItemAuctionPrice: { price: { price, referencePrice } }, either of which may be missing or 0.
+function parsePrice(v: unknown): number {
+  const p = isRecord(v) && isRecord(v.price) ? v.price : {}
+  return num(p.price) || num(p.referencePrice) || 0
 }
 
 // Items bigger than the largest container (7x4) could never be placed.
@@ -43,28 +68,32 @@ if (!KEY) {
   process.exit(1)
 }
 
-async function call<T>(method: string, body: object, tries = 4): Promise<T> {
+async function call(method: string, body: object, tries = 4): Promise<unknown> {
   const res = await fetch(API + method, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1', 'deltaforceapi-gateway-key': KEY },
     body: JSON.stringify(body),
   })
-  if (res.ok) return res.json() as Promise<T>
+  if (res.ok) return res.json()
   if (tries > 1 && (res.status === 429 || res.status >= 500)) {
     await new Promise((r) => setTimeout(r, 1000 * 2 ** (4 - tries)))
-    return call<T>(method, body, tries - 1)
+    return call(method, body, tries - 1)
   }
-  const err = (await res.json().catch(() => ({}))) as { message?: string }
-  throw new Error(`${method} ${res.status}: ${err.message ?? res.statusText}`)
+  const err: unknown = await res.json().catch(() => null)
+  throw new Error(`${method} ${res.status}: ${(isRecord(err) && str(err.message)) || res.statusText}`)
 }
 
 async function listItems(): Promise<ApiItem[]> {
   const items: ApiItem[] = []
   let pageToken: string | null | undefined
   do {
-    const page = await call<{ items?: ApiItem[]; nextPageToken?: string }>('ListItems', { pageSize: 1000, ...(pageToken && { pageToken }) })
-    items.push(...(page.items ?? []))
-    pageToken = page.items?.length ? page.nextPageToken : null
+    const page = await call('ListItems', { pageSize: 1000, ...(pageToken && { pageToken }) })
+    const batch = isRecord(page) && Array.isArray(page.items) ? page.items : []
+    for (const v of batch) {
+      const item = parseItem(v)
+      if (item) items.push(item)
+    }
+    pageToken = batch.length && isRecord(page) ? str(page.nextPageToken) : null
   } while (pageToken)
   return items
 }
@@ -97,7 +126,7 @@ const candidates = all
   .map((it) => ({ ...it, w: it.height, h: it.width }))
   .filter((it) => it.auctionable && it.iconUrl && it.w > 0 && it.h > 0 && it.w <= MAX_W && it.h <= MAX_H)
 
-const prices = await mapPool(candidates, (it) => call<ApiPrice>('GetItemAuctionPrice', { itemId: it.id }))
+const prices = await mapPool(candidates, async (it) => parsePrice(await call('GetItemAuctionPrice', { itemId: it.id })))
 
 const catalog = candidates
   .map((it, i) => ({
@@ -108,7 +137,7 @@ const catalog = candidates
     quality: it.quality,
     w: it.w,
     h: it.h,
-    price: prices[i]?.price?.price || prices[i]?.price?.referencePrice || 0,
+    price: prices[i] ?? 0,
   }))
   .filter((it) => it.price > 0)
   .sort((a, b) => a.name.localeCompare(b.name))

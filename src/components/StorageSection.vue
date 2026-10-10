@@ -5,7 +5,12 @@ import { t, tn } from '../i18n/index.ts'
 import type { GridStorage } from '../domain/models.ts'
 
 defineOptions({ inheritAttrs: false })
-withDefaults(defineProps<{ grid: GridStorage; note?: string }>(), { note: '' })
+interface Props {
+  grid: GridStorage
+  note?: string
+}
+
+withDefaults(defineProps<Props>(), { note: '' })
 </script>
 
 <template>

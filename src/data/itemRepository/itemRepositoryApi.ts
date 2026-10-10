@@ -1,4 +1,5 @@
 import type { Category, ItemDef, Rarity, SlotType } from '../../domain/models.ts'
+import { RARITY_LIST } from '../../domain/rarity.ts'
 import type { ItemRepository } from './itemRepository.ts'
 import catalog from './catalog.json'
 
@@ -38,7 +39,7 @@ function toDef(it: CatalogEntry): ItemDef {
   const rarity: Rarity =
     it.type === 'WEAPON'
       ? (WEAPON_RARITY_PRICE.find(([max]) => it.price < max)?.[1] ?? 6)
-      : (Math.min(6, Math.max(1, it.quality)) as Rarity)
+      : (RARITY_LIST.find((r) => r === it.quality) ?? (it.quality > 6 ? 6 : 1))
   const slot = SLOT_BY_SUB[it.sub] ?? (it.type === 'WEAPON' ? 'weapon' : undefined)
   return {
     name: it.name,

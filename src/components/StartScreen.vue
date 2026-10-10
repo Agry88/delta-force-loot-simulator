@@ -3,9 +3,17 @@ import { LOOT_MODES } from '../domain/loot.ts'
 import { t } from '../i18n/index.ts'
 import type { LootMode } from '../domain/models.ts'
 
-defineProps<{ duration: number }>()
+interface Props {
+  duration: number
+}
+
+interface Emits {
+  start: []
+}
+
+defineProps<Props>()
 const mode = defineModel<LootMode>('mode', { default: 'both' })
-const emit = defineEmits<{ start: [] }>()
+const emit = defineEmits<Emits>()
 </script>
 
 <template>

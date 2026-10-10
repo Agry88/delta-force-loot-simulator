@@ -13,7 +13,12 @@ export interface Messages {
 export type Locale = 'en' | 'zh-TW'
 
 const MESSAGES: Record<Locale, Messages> = { en, 'zh-TW': zhTW }
-export const LOCALES: { id: Locale; label: string }[] = [
+export interface LocaleOption {
+  id: Locale
+  label: string
+}
+
+export const LOCALES: LocaleOption[] = [
   { id: 'en', label: 'EN' },
   { id: 'zh-TW', label: '繁中' },
 ]

@@ -1,5 +1,7 @@
 import type { Rarity } from './models.ts'
 
+export const RARITY_LIST: Rarity[] = [1, 2, 3, 4, 5, 6]
+
 export const RARITIES: Record<Rarity, string> = {
   1: 'Common',
   2: 'Uncommon',

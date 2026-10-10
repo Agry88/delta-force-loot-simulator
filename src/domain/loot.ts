@@ -80,6 +80,12 @@ function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false,
   }
 }
 
+export function findSlot(slots: SlotStorage[], id: string): SlotStorage {
+  const slot = slots.find((s) => s.id === id)
+  if (!slot) throw new Error(`Unknown slot: ${id}`)
+  return slot
+}
+
 function makeSlots(owner: Owner): SlotStorage[] {
   return SLOTS.map((s) => ({ ...s, kind: 'slot', owner, items: [] }))
 }
@@ -91,16 +97,16 @@ function makeGrid(owner: Owner, id: string, name: string, w: number, h: number, 
 // Rolls the player's starting kit and the containers they loot, from the items a repository provides.
 export class LootGenerator {
   private readonly items: ItemRepository
-  private readonly perRarity: Partial<Record<Rarity, number>>
+  private readonly perRarity: Record<Rarity, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
 
   constructor(items: ItemRepository) {
     this.items = items
-    this.perRarity = items.getAll().reduce<Partial<Record<Rarity, number>>>((acc, d) => ((acc[d.rarity] = (acc[d.rarity] || 0) + 1), acc), {})
+    for (const d of items.getAll()) this.perRarity[d.rarity]++
   }
 
   createPlayer(): Player {
     const slots = makeSlots('player')
-    const slot = (id: string) => slots.find((s) => s.id === id)!
+    const slot = (id: string) => findSlot(slots, id)
     const equip = (id: string, name: string, cond?: number) =>
       slot(id).items.push(makeItem(this.items.getByName(name), { revealed: true, owned: true, cond }))
     equip('weapon1', 'AUG Assault Rifle', 30)
@@ -132,12 +138,12 @@ export class LootGenerator {
       this.items
         .getAll()
         .filter((def) => !slot || def.slot === slot)
-        .map((def) => {
-          let w = RARITY_WEIGHT[def.rarity] / this.perRarity[def.rarity]!
+        .map((def): [ItemDef, number] => {
+          let w = RARITY_WEIGHT[def.rarity] / this.perRarity[def.rarity]
           if (def.rarity >= 4) w *= luck
           if (prefer.includes(def.cat)) w *= 3
           w *= CATEGORY_WEIGHT[def.cat] ?? 1
-          return [def, w] as [ItemDef, number]
+          return [def, w]
         }),
     )
   }

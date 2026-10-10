@@ -1,23 +1,32 @@
 <script setup lang="ts">
+import { useTemplateRef } from 'vue'
 import ItemTile from './ItemTile.vue'
 import type { GridStorage, Item } from '../domain/models.ts'
 
-const props = defineProps<{ grid: GridStorage }>()
-const emit = defineEmits<{
+interface Props {
+  grid: GridStorage
+}
+
+interface Emits {
   'item-click': [item: Item]
   'drag-start': [item: Item, gx: number, gy: number]
   'drop-at': [cx: number, cy: number]
-}>()
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+const gridEl = useTemplateRef('grid')
 
 function onDrop(e: DragEvent) {
-  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  if (!gridEl.value) return
+  const r = gridEl.value.getBoundingClientRect()
   const cell = r.width / props.grid.w
   emit('drop-at', Math.floor((e.clientX - r.left) / cell), Math.floor((e.clientY - r.top) / cell))
 }
 </script>
 
 <template>
-  <div class="grid" :style="{ '--w': grid.w, '--h': grid.h }" @dragover.prevent @drop.prevent="onDrop">
+  <div ref="grid" class="grid" :style="{ '--w': grid.w, '--h': grid.h }" @dragover.prevent @drop.prevent="onDrop">
     <ItemTile
       v-for="item in grid.items"
       :key="item.uid"

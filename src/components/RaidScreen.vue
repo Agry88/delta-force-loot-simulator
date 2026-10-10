@@ -5,6 +5,7 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import { lootGenerator } from '../di.ts'
 import { findSpot, fits } from '../domain/grid.ts'
+import { findSlot } from '../domain/loot.ts'
 import { carryWeight, lootValue, quickMoveTargets, raidResult } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
@@ -13,8 +14,17 @@ import { t, tn } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
 import type { Item, LootMode, RaidResult, Storage } from '../domain/models.ts'
 
-const props = withDefaults(defineProps<{ duration: number; mode?: LootMode }>(), { mode: 'both' })
-const emit = defineEmits<{ finish: [result: RaidResult] }>()
+interface Props {
+  duration: number
+  mode?: LootMode
+}
+
+interface Emits {
+  finish: [result: RaidResult]
+}
+
+const props = withDefaults(defineProps<Props>(), { mode: 'both' })
+const emit = defineEmits<Emits>()
 
 const player = reactive(lootGenerator.createPlayer())
 const loot = ref(lootGenerator.createLootContainer(props.mode))
@@ -23,8 +33,8 @@ const remaining = ref(props.duration)
 const toast = ref('')
 
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...player.grids])
-const playerSlot = (id: string) => player.slots.find((s) => s.id === id)!
-const lootSlot = (id: string) => loot.value.slots.find((s) => s.id === id)!
+const playerSlot = (id: string) => findSlot(player.slots, id)
+const lootSlot = (id: string) => findSlot(loot.value.slots, id)
 
 const earnings = computed(() => lootValue(playerStorages.value))
 const weight = computed(() => carryWeight(playerStorages.value))
@@ -117,7 +127,15 @@ function quickMove(item: Item, from: Storage) {
   flash(t('raid.noSpace'))
 }
 
-let drag: { item: Item; from: Storage; gx: number; gy: number } | null = null
+interface Drag {
+  item: Item
+  from: Storage
+  // Which cell of the item was grabbed.
+  gx: number
+  gy: number
+}
+
+let drag: Drag | null = null
 function onDrop(target: Storage, cx: number, cy: number) {
   if (!drag) return
   const { item, from, gx, gy } = drag
