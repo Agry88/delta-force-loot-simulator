@@ -10,7 +10,7 @@
   --accent: #3ad6b0;
   --danger: #ff5a5f;
   --loot: #7a1f24;
-  --cell: 52px;
+  --cell: 48px;
 
   font-family: 'Rajdhani', system-ui, sans-serif;
   color: var(--text);

@@ -1,35 +1,41 @@
-// Grid helpers. A grid is { w, h, items: [{ x, y, def: { w, h } }] }.
+// Storage helpers. Two kinds of storage hold items:
+//   grid: { kind: 'grid', w, h, items } — items sit at x/y and take def.w × def.h cells
+//   slot: { kind: 'slot', accepts, locked?, items } — holds one item whose def.slot matches
 
-export function fits(grid, w, h, x, y, ignore = null) {
-  if (x < 0 || y < 0 || x + w > grid.w || y + h > grid.h) return false
-  return grid.items.every(
+export function fits(target, def, x, y, ignore = null) {
+  if (target.kind === 'slot') {
+    return !target.locked && def.slot === target.accepts && target.items.every((it) => it === ignore)
+  }
+  if (x < 0 || y < 0 || x + def.w > target.w || y + def.h > target.h) return false
+  return target.items.every(
     (it) =>
       it === ignore ||
       x >= it.x + it.def.w ||
-      it.x >= x + w ||
+      it.x >= x + def.w ||
       y >= it.y + it.def.h ||
-      it.y >= y + h,
+      it.y >= y + def.h,
   )
 }
 
-// First free spot scanning row by row, or null when the item doesn't fit.
-export function findSpot(grid, w, h) {
-  for (let y = 0; y <= grid.h - h; y++) {
-    for (let x = 0; x <= grid.w - w; x++) {
-      if (fits(grid, w, h, x, y)) return { x, y }
+function freeSpots(target, def) {
+  if (target.kind === 'slot') return fits(target, def, 0, 0) ? [{ x: 0, y: 0 }] : []
+  const spots = []
+  for (let y = 0; y <= target.h - def.h; y++) {
+    for (let x = 0; x <= target.w - def.w; x++) {
+      if (fits(target, def, x, y)) spots.push({ x, y })
     }
   }
-  return null
+  return spots
+}
+
+// First free spot scanning row by row, or null when the item doesn't fit.
+export function findSpot(target, def) {
+  return freeSpots(target, def)[0] ?? null
 }
 
 // A random free spot, used to scatter loot around a container.
-export function randomSpot(grid, w, h) {
-  const spots = []
-  for (let y = 0; y <= grid.h - h; y++) {
-    for (let x = 0; x <= grid.w - w; x++) {
-      if (fits(grid, w, h, x, y)) spots.push({ x, y })
-    }
-  }
+export function randomSpot(target, def) {
+  const spots = freeSpots(target, def)
   return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null
 }
 

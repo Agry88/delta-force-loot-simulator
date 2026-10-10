@@ -1,26 +1,34 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import GridContainer from './GridContainer.vue'
-import { createLootContainer, SEARCH_TIME } from '../data/items.js'
-import { findSpot, fits, usedCells } from '../lib/grid.js'
+import OperatorFigure from './OperatorFigure.vue'
+import SlotBox from './SlotBox.vue'
+import StorageSection from './StorageSection.vue'
+import { createLootContainer, createPlayer, RARITIES, SEARCH_TIME } from '../data/items.js'
+import { findSpot, fits } from '../lib/grid.js'
 import { formatClock, formatValue } from '../lib/format.js'
+import { hideTooltip, tooltip } from '../lib/tooltip.js'
 
 const props = defineProps({ duration: { type: Number, required: true } })
 const emit = defineEmits(['finish'])
 
-const player = reactive([
-  { id: 'rig', name: 'Chest Rig', w: 7, h: 2, items: [] },
-  { id: 'pockets', name: 'Pockets', w: 5, h: 1, items: [] },
-  { id: 'backpack', name: 'Backpack', w: 6, h: 4, items: [] },
-  { id: 'safebox', name: 'Safebox', w: 2, h: 2, items: [] },
-])
+const player = reactive(createPlayer())
 const loot = ref(createLootContainer())
 const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
-const earnings = computed(() => player.reduce((sum, g) => sum + g.items.reduce((s, it) => s + it.value, 0), 0))
-const searching = computed(() => loot.value.items.some((it) => !it.revealed))
+const playerStorages = computed(() => [...player.slots, ...player.grids])
+const playerSlot = (id) => player.slots.find((s) => s.id === id)
+const lootSlot = (id) => loot.value.slots.find((s) => s.id === id)
+
+// Gear you spawned with doesn't count as loot.
+const earnings = computed(() =>
+  playerStorages.value.reduce((sum, s) => sum + s.items.reduce((t, it) => t + (it.owned ? 0 : it.value), 0), 0),
+)
+const weight = computed(
+  () => 9.5 + playerStorages.value.reduce((sum, s) => sum + s.items.reduce((t, it) => t + it.def.w * it.def.h * 0.55, 0), 0),
+)
+const searching = computed(() => loot.value.grids.some((g) => g.items.some((it) => !it.revealed)))
 
 // --- timer -----------------------------------------------------------------
 
@@ -38,20 +46,30 @@ function finish() {
   finished = true
   clearInterval(timerId)
   searchToken++
+  hideTooltip()
   emit('finish', {
-    items: player.flatMap((g) => g.items.map((it) => ({ ...it.def, value: it.value, where: g.name }))),
+    items: playerStorages.value.flatMap((s) =>
+      s.items.filter((it) => !it.owned).map((it) => ({ ...it.def, value: it.value, where: s.name })),
+    ),
     containersOpened: containersOpened.value,
   })
+}
+
+function onKey(e) {
+  if (e.key === 'Escape') finish()
 }
 
 onMounted(() => {
   endAt = performance.now() + props.duration * 1000
   timerId = setInterval(tick, 100)
+  window.addEventListener('keydown', onKey)
   runSearch()
 })
 onBeforeUnmount(() => {
   clearInterval(timerId)
+  window.removeEventListener('keydown', onKey)
   searchToken++
+  hideTooltip()
 })
 
 // --- searching: reveal loot one item at a time ------------------------------
@@ -61,7 +79,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function runSearch() {
   const token = ++searchToken
-  const queue = [...loot.value.items].sort((a, b) => a.y - b.y || a.x - b.x)
+  const queue = loot.value.grids.flatMap((g) => [...g.items].sort((a, b) => a.y - b.y || a.x - b.x))
   for (const item of queue) {
     item.searching = true
     await sleep(SEARCH_TIME[item.def.rarity] * 1000)
@@ -72,6 +90,7 @@ async function runSearch() {
 }
 
 function nextContainer() {
+  hideTooltip()
   loot.value = createLootContainer()
   containersOpened.value++
   runSearch()
@@ -87,6 +106,7 @@ function flash(msg) {
 }
 
 function moveItem(item, from, to, x, y) {
+  hideTooltip()
   from.items.splice(from.items.indexOf(item), 1)
   item.x = x
   item.y = y
@@ -94,84 +114,132 @@ function moveItem(item, from, to, x, y) {
 }
 
 function quickMove(item, from) {
-  if (!item.revealed) return
-  const targets = from === loot.value ? player : [loot.value]
-  for (const g of targets) {
-    const spot = findSpot(g, item.def.w, item.def.h)
-    if (spot) return moveItem(item, from, g, spot.x, spot.y)
+  if (!item.revealed || from.locked) return
+  const targets =
+    from.owner === 'loot'
+      ? [...(item.def.slot ? player.slots : []), ...player.grids]
+      : [...loot.value.grids, ...loot.value.slots]
+  for (const t of targets) {
+    const spot = findSpot(t, item.def)
+    if (spot) return moveItem(item, from, t, spot.x, spot.y)
   }
   flash('Not enough space')
 }
 
 let drag = null
-function onDragStart(item, grid, gx, gy) {
-  drag = { item, grid, gx, gy }
-}
 function onDrop(target, cx, cy) {
   if (!drag) return
-  const { item, grid, gx, gy } = drag
+  const { item, from, gx, gy } = drag
   drag = null
-  const x = cx - gx
-  const y = cy - gy
-  if (fits(target, item.def.w, item.def.h, x, y, item)) moveItem(item, grid, target, x, y)
-  else flash("Doesn't fit there")
+  const x = target.kind === 'slot' ? 0 : cx - gx
+  const y = target.kind === 'slot' ? 0 : cy - gy
+  if (target === from && target.kind === 'slot') return
+  if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
+  else flash(target.kind === 'slot' ? "Can't equip that here" : "Doesn't fit there")
 }
+
+// Event handlers for one storage (grid or slot), spread onto its component.
+function on(storage) {
+  return {
+    'item-click': (item) => quickMove(item, storage),
+    'drag-start': (item, gx, gy) => (drag = { item, from: storage, gx, gy }),
+    'drop-at': (cx, cy) => onDrop(storage, cx, cy),
+  }
+}
+
+const tipStyle = computed(() => ({
+  left: `${Math.min(tooltip.x + 16, window.innerWidth - 230)}px`,
+  top: `${tooltip.y + 16}px`,
+}))
 </script>
 
 <template>
   <div class="raid">
     <header class="topbar">
-      <div class="tabs"><span class="tab active">CHARACTER</span></div>
+      <nav class="tabs">
+        <kbd>Q</kbd>
+        <span class="tab active">CHARACTER</span>
+        <span class="tab">HEALTH</span>
+        <kbd>E</kbd>
+      </nav>
       <div class="timer" :class="{ danger: remaining <= 10 }">
-        Time to Extraction <b>{{ formatClock(remaining) }}</b>
+        <span>Time to Extraction</span>
+        <span class="clock">◷</span>
+        <b>{{ formatClock(remaining) }}</b>
       </div>
-      <button class="btn" @click="finish">Extract now</button>
     </header>
 
-    <div class="columns">
-      <section class="panel character">
-        <div class="avatar">🪖</div>
-        <div class="gear">
-          <div class="slot"><span>⛑️</span>Helmet</div>
-          <div class="slot"><span>🦺</span>Body Armor</div>
-          <div class="slot wide"><span>🔫</span>AUG 5.56x45</div>
+    <main class="columns">
+      <section class="character">
+        <div class="figure"><OperatorFigure /></div>
+        <div class="equipment">
+          <SlotBox v-for="id in ['helmet', 'armor', 'pistol', 'melee']" :key="id" :slot="playerSlot(id)" v-on="on(playerSlot(id))" />
+          <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="playerSlot(id)" v-on="on(playerSlot(id))" />
         </div>
-        <div class="stat">Containers searched: <b>{{ containersOpened }}</b></div>
+        <div class="vitals">
+          <div class="weight">
+            <span class="lock">🔒</span>
+            <b>{{ weight.toFixed(1) }}</b><small>/72kg</small>
+          </div>
+          <div class="hp">
+            <b>80</b><small>/80</small>
+            <span class="hp-bar"><span /></span>
+          </div>
+          <div class="callsign">Operator</div>
+        </div>
       </section>
 
       <section class="panel inventory">
         <div class="earnings">
-          Total Battle Earnings <span class="coin" /> <b>{{ formatValue(earnings) }}</b>
+          <span class="menu">☰</span>
+          Total Battle Earnings
+          <span class="coin" />
+          <b>{{ formatValue(earnings) }}</b>
         </div>
-        <div v-for="g in player" :key="g.id" class="section">
-          <div class="section-head">
-            {{ g.name }}: {{ usedCells(g) }}<small>/{{ g.w * g.h }}</small>
-            <em v-if="g.id === 'safebox'">protected</em>
-          </div>
-          <GridContainer
+        <div class="scroll">
+          <StorageSection
+            v-for="g in player.grids"
+            :key="g.id"
             :grid="g"
-            @item-click="(it) => quickMove(it, g)"
-            @drag-start="(it, gx, gy) => onDragStart(it, g, gx, gy)"
-            @drop-at="(cx, cy) => onDrop(g, cx, cy)"
+            :note="g.id === 'safebox' ? 'Protected' : ''"
+            v-on="on(g)"
           />
         </div>
       </section>
 
       <section class="panel loot">
-        <div class="loot-head">LOOT</div>
-        <div class="section-head">
-          {{ loot.name }}
+        <div class="loot-head">
+          LOOT
+          <span class="loot-name">{{ loot.name }}</span>
           <em>{{ searching ? 'Searching…' : 'Searched' }}</em>
         </div>
-        <GridContainer
-          :key="containersOpened"
-          :grid="loot"
-          @item-click="(it) => quickMove(it, loot)"
-          @drag-start="(it, gx, gy) => onDragStart(it, loot, gx, gy)"
-          @drop-at="(cx, cy) => onDrop(loot, cx, cy)"
-        />
-        <button class="btn next" @click="nextContainer">Search next container →</button>
+        <div :key="containersOpened" class="scroll">
+          <div v-if="loot.slots.length" class="loot-gear">
+            <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="lootSlot(id)" v-on="on(lootSlot(id))" />
+            <SlotBox
+              v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
+              :key="id"
+              :slot="lootSlot(id)"
+              v-on="on(lootSlot(id))"
+            />
+          </div>
+          <StorageSection v-for="g in loot.grids" :key="g.id" :grid="g" v-on="on(g)" />
+          <button class="next" @click="nextContainer">Search next container →</button>
+        </div>
       </section>
+    </main>
+
+    <footer class="hints">
+      <span><kbd>LMB</kbd> Quick Move</span>
+      <span class="desktop-only"><kbd>Drag</kbd> Carry / Put Back</span>
+      <span class="desktop-only"><kbd>Drag</kbd> Equip / Swap</span>
+      <button class="extract" @click="finish"><kbd>Esc</kbd> Extract</button>
+    </footer>
+
+    <div v-if="tooltip.item" class="tooltip" :style="tipStyle">
+      <div class="tip-name">{{ tooltip.item.def.name }}</div>
+      <div class="tip-rarity" :class="`r${tooltip.item.def.rarity}`">{{ RARITIES[tooltip.item.def.rarity] }}</div>
+      <div class="tip-value"><span class="coin" /> {{ formatValue(tooltip.item.value) }}</div>
     </div>
 
     <div v-if="toast" class="toast">{{ toast }}</div>
@@ -180,185 +248,376 @@ function onDrop(target, cx, cy) {
 
 <style scoped>
 .raid {
-  min-height: 100vh;
-  padding: 12px 16px 24px;
+  --slot: 104px;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0 24px;
+  background:
+    radial-gradient(ellipse at 22% 45%, #1c242c 0%, transparent 55%),
+    linear-gradient(180deg, #0f1317, #0a0d10);
+  overflow: hidden;
 }
+
+/* --- top bar --- */
 .topbar {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  padding: 14px 0 10px;
+}
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b0f12;
+  background: #59636d;
+  border-radius: 2px;
+}
+.tabs kbd {
+  margin: 0 8px;
 }
 .tab {
-  display: inline-block;
-  padding: 6px 16px;
+  padding: 7px 18px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  border: 1px solid #2b333c;
-  border-bottom: 2px solid var(--accent);
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+.tab.active {
   color: var(--text-strong);
+  background: linear-gradient(180deg, transparent, rgb(58 214 176 / 0.12));
+  border: 1px solid #2c353e;
+  border-bottom: 2px solid var(--accent);
 }
 .timer {
   margin-left: auto;
-  color: var(--text);
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 16px;
 }
 .timer b {
-  font-size: 24px;
+  font-size: 22px;
   color: var(--text-strong);
-  margin-left: 6px;
   font-variant-numeric: tabular-nums;
 }
-.timer.danger b {
+.clock {
+  font-size: 18px;
+  color: var(--text-strong);
+}
+.timer.danger b,
+.timer.danger .clock {
   color: var(--danger);
   animation: blink 0.5s steps(2) infinite;
 }
 
-.btn {
-  font: inherit;
-  font-weight: 700;
-  padding: 6px 14px;
-  color: var(--text-strong);
-  background: #232b33;
-  border: 1px solid #3a434d;
-  cursor: pointer;
-}
-.btn:hover {
-  background: #2c3640;
-}
-
+/* --- columns --- */
 .columns {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 22px;
+  min-height: 0;
 }
 .panel {
-  background: var(--panel);
-  border: 1px solid #222a32;
-  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: calc(9 * var(--cell) + 5px + 40px);
+  padding: 10px 12px;
+  background: rgb(20 26 32 / 0.85);
+  border: 1px solid #1f262d;
+}
+.scroll {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a444e transparent;
 }
 
+/* --- character --- */
 .character {
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.avatar {
-  font-size: 96px;
-  line-height: 1;
-  padding: 12px 0;
-}
-.gear {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 0;
 }
-.slot {
+.figure {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 60px;
+}
+.equipment {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  font-size: 12px;
-  padding: 6px;
-  background: var(--cell-bg);
-  border: 1px solid var(--cell-line);
+  align-items: flex-end;
+  gap: 6px;
+  width: calc(var(--slot) * 2 + 6px);
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-.slot span {
-  font-size: 26px;
+.vitals {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-strong);
 }
-.slot.wide {
-  grid-column: span 2;
+.vitals small {
+  color: var(--muted);
 }
-.stat {
+.weight {
+  font-size: 20px;
+}
+.weight .lock {
+  font-size: 13px;
+  margin-right: 4px;
+}
+.hp {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 18px;
+}
+.hp-bar {
+  width: 110px;
+  height: 4px;
+  margin-left: 8px;
+  background: #2a3138;
+  align-self: center;
+}
+.hp-bar span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #d9dee3;
+}
+.callsign {
+  color: var(--muted);
   font-size: 14px;
 }
 
+/* --- inventory --- */
 .earnings {
-  font-size: 17px;
-  color: var(--text-strong);
-  margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 2px 4px 10px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.menu {
+  color: var(--muted);
 }
 .coin {
+  display: inline-block;
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff, #9aa0a6);
-}
-.section {
-  margin-bottom: 10px;
-}
-.section-head {
-  background: var(--header);
-  padding: 3px 8px;
-  margin-bottom: 4px;
-  color: var(--text-strong);
-  font-weight: 600;
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.section-head small {
-  color: var(--muted);
-}
-.section-head em {
-  margin-left: auto;
-  font-style: normal;
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 500;
+  background: radial-gradient(circle at 35% 35%, #fff, #8a939b);
 }
 
+/* --- loot --- */
 .loot-head {
-  background: linear-gradient(90deg, var(--loot), #3a1416);
-  color: #fff;
-  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
   font-size: 20px;
+  font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 6px 12px;
-  margin-bottom: 8px;
+  color: #fff;
+  background: linear-gradient(90deg, #8a2228, #4a1418 70%, #2a1214);
+  border-left: 3px solid #e5484d;
+}
+.loot-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #f2c9cb;
+}
+.loot-head em {
+  margin-left: auto;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #d9a3a6;
+}
+.loot-gear {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 .next {
   display: block;
   width: 100%;
-  margin-top: 10px;
+  margin-top: 14px;
+  padding: 8px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text-strong);
+  background: #1e262e;
+  border: 1px solid #343e48;
+  cursor: pointer;
+}
+.next:hover {
+  background: #27313a;
 }
 
+/* --- footer hints --- */
+.hints {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 26px;
+  padding: 10px 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.hints span,
+.extract {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.extract {
+  padding: 0;
+  font: inherit;
+  color: var(--text-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.extract:hover {
+  color: var(--accent);
+}
+
+/* --- floating bits --- */
+.tooltip {
+  position: fixed;
+  z-index: 10;
+  min-width: 150px;
+  padding: 6px 10px;
+  pointer-events: none;
+  background: rgb(14 18 22 / 0.96);
+  border: 1px solid #333d47;
+  color: var(--text-strong);
+}
+.tip-name {
+  font-weight: 600;
+}
+.tip-rarity {
+  font-size: 12px;
+  color: var(--rc);
+}
+.tip-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 32px;
+  bottom: 56px;
   transform: translateX(-50%);
-  background: #2a1517;
-  border: 1px solid var(--danger);
-  color: #ffd7d9;
+  z-index: 11;
   padding: 8px 18px;
   font-weight: 600;
+  color: #ffd7d9;
+  background: #2a1517;
+  border: 1px solid var(--danger);
 }
 
 @keyframes blink {
   50% { opacity: 0.4; }
 }
 
-@media (max-width: 700px) {
+/* Narrower desktops: drop the figure, keep the gear column. */
+@media (max-width: 1340px) {
   .raid {
-    padding: 10px 16px 24px;
+    --slot: 92px;
+  }
+  .figure,
+  .vitals {
+    display: none;
   }
   .character {
-    display: none;
+    grid-template-columns: auto;
+  }
+}
+
+/* Tablets and phones: stack everything and scroll the page. */
+@media (max-width: 1100px) {
+  .raid {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    padding: 0 16px;
+  }
+  .columns {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   .loot {
     order: -1;
   }
-  .timer {
-    margin-left: 0;
+  .character {
+    order: 1;
+  }
+  .equipment {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: auto;
+    max-width: calc(var(--slot) * 4 + 18px);
+  }
+  .scroll {
+    overflow: visible;
+  }
+  .hints {
+    position: sticky;
+    bottom: 0;
+    background: #0a0d10;
+  }
+}
+
+@media (max-width: 700px) {
+  .raid {
+    --slot: 72px;
+  }
+  .panel {
+    width: 100%;
+    max-width: calc(7 * var(--cell) + 26px);
+  }
+  .tab:not(.active),
+  .tabs kbd,
+  .hints .desktop-only {
+    display: none;
+  }
+  .timer > span:first-child {
+    display: none;
   }
 }
 </style>
