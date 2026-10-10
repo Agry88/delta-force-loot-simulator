@@ -31,7 +31,8 @@ const byRarity = computed(() =>
     </div>
 
     <div v-if="best" class="best" :class="`r${best.rarity}`">
-      <span class="icon">{{ best.icon }}</span>
+      <img v-if="best.img" class="icon" :src="best.img" alt="" />
+      <span v-else class="icon">{{ best.icon }}</span>
       <div>
         <div class="label">{{ t('result.best') }} · {{ tn(RARITIES[best.rarity]) }}</div>
         <div class="best-name">{{ tn(best.name) }}</div>
@@ -47,7 +48,8 @@ const byRarity = computed(() =>
 
     <ul v-if="items.length" class="list">
       <li v-for="(it, i) in items" :key="i" :class="`r${it.rarity}`">
-        <span class="icon">{{ it.icon }}</span>
+        <img v-if="it.img" class="icon" :src="it.img" alt="" loading="lazy" />
+        <span v-else class="icon">{{ it.icon }}</span>
         <span class="name">{{ tn(it.name) }}</span>
         <span class="where">{{ tn(it.where) }}</span>
         <span class="val">{{ formatValue(it.value) }}</span>
@@ -112,6 +114,11 @@ h1 {
 .best .icon {
   font-size: 52px;
 }
+.best img.icon {
+  width: 96px;
+  height: 64px;
+  object-fit: contain;
+}
 .best-name {
   font-size: 22px;
   font-weight: 700;
@@ -150,6 +157,11 @@ h1 {
 }
 .list .icon {
   font-size: 22px;
+}
+.list img.icon {
+  width: 36px;
+  height: 24px;
+  object-fit: contain;
 }
 .list .name {
   color: var(--text-strong);

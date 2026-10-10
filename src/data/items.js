@@ -1,4 +1,5 @@
 import { randomSpot } from '../lib/grid.js'
+import catalog from './catalog.json'
 
 export const RARITIES = {
   1: 'Common',
@@ -15,53 +16,67 @@ const RARITY_WEIGHT = { 1: 40, 2: 28, 3: 17, 4: 9, 5: 4.5, 6: 1.5 }
 // Seconds it takes to search (reveal) one item of each rarity.
 export const SEARCH_TIME = { 1: 0.5, 2: 0.7, 3: 0.9, 4: 1.2, 5: 1.6, 6: 2.0 }
 
+// Real items, prices and icons snapshotted from deltaforceapi.com by `pnpm sync-items`.
+// Each entry: { id, name, type, sub, quality, w, h, price } with w/h in grid cells.
+const ICON_URL = (id) => `https://cdn.deltaforceapi.com/deltaforceapi/item/${id}/icon.png`
+
+// Weapons have no quality in the API, so their rarity comes from price.
+const WEAPON_RARITY_PRICE = [[15000, 1], [40000, 2], [100000, 3], [200000, 4], [500000, 5]]
+
+const MAG_SIZE = {
+  WEAPON_ASSAULT_RIFLE: 30,
+  WEAPON_SMG: 30,
+  WEAPON_LMG: 100,
+  WEAPON_MARKSMAN_RIFLE: 20,
+  WEAPON_SNIPER_RIFLE: 5,
+  WEAPON_SHOTGUN: 7,
+  WEAPON_PISTOL: 15,
+}
+
+// Max durability of helmets and body armor by rarity.
+const DURABILITY = { 1: 20, 2: 25, 3: 38, 4: 50, 5: 61, 6: 75 }
+
+const CATEGORY_BY_SUB = {
+  COLLECTIBLE_MEDICAL_ITEM: 'med',
+  COLLECTIBLE_ELECTRONIC_PRODUCT: 'tech',
+  COLLECTIBLE_CRAFTWORK: 'valuable',
+  CONSUMABLE_ARMOR_REP: 'misc',
+}
+const CATEGORY_BY_TYPE = { WEAPON: 'weapon', WEAPON_PART: 'part', GEAR: 'gear', AMMO: 'ammo', CONSUMABLE: 'med', KEYCARD: 'valuable' }
+
+const SLOT_BY_SUB = { WEAPON_PISTOL: 'pistol', GEAR_HELMET: 'helmet', GEAR_VEST: 'armor' }
+
+function toDef(it) {
+  const rarity =
+    it.type === 'WEAPON'
+      ? (WEAPON_RARITY_PRICE.find(([max]) => it.price < max)?.[1] ?? 6)
+      : Math.min(6, Math.max(1, it.quality))
+  const slot = SLOT_BY_SUB[it.sub] ?? (it.type === 'WEAPON' ? 'weapon' : undefined)
+  return {
+    name: it.name,
+    img: ICON_URL(it.id),
+    cat: CATEGORY_BY_SUB[it.sub] ?? CATEGORY_BY_TYPE[it.type] ?? 'misc',
+    slot,
+    rarity,
+    w: it.w,
+    h: it.h,
+    value: it.price,
+    mag: MAG_SIZE[it.sub],
+    dur: slot === 'helmet' || slot === 'armor' ? DURABILITY[rarity] : undefined,
+  }
+}
+
 // w/h are grid cells; value is the base price before random variance.
 // slot: which equipment slot the item can be equipped in.
 // dur: max durability (helmets/armor); mag: magazine size (guns).
+// The API has no melee weapons, so the knife stays hand-made.
 export const CATALOG = [
-  { name: 'Bandage', icon: '🩹', cat: 'med', rarity: 1, w: 1, h: 1, value: 800 },
-  { name: '9mm Ammo', icon: '🔸', cat: 'ammo', rarity: 1, w: 1, h: 1, value: 600 },
-  { name: 'Energy Drink', icon: '🥤', cat: 'misc', rarity: 1, w: 1, h: 1, value: 1200 },
-  { name: 'Screws', icon: '🔩', cat: 'misc', rarity: 1, w: 1, h: 1, value: 900 },
-  { name: 'Lighter', icon: '🔥', cat: 'misc', rarity: 1, w: 1, h: 1, value: 700 },
+  ...catalog.items.map(toDef),
   { name: 'Combat Knife', icon: '🔪', cat: 'weapon', slot: 'melee', rarity: 1, w: 2, h: 1, value: 1500 },
-
-  { name: '5.56x45 Ammo', icon: '🔶', cat: 'ammo', rarity: 2, w: 1, h: 1, value: 2400 },
-  { name: 'First Aid Kit', icon: '🧰', cat: 'med', rarity: 2, w: 1, h: 2, value: 3500 },
-  { name: 'Canned Food', icon: '🥫', cat: 'misc', rarity: 2, w: 1, h: 1, value: 2000 },
-  { name: 'Flashlight', icon: '🔦', cat: 'tech', rarity: 2, w: 1, h: 2, value: 3000 },
-  { name: 'Compass', icon: '🧭', cat: 'misc', rarity: 2, w: 1, h: 1, value: 4200 },
-  { name: 'G18 Pistol', icon: '🔫', cat: 'weapon', slot: 'pistol', mag: 17, rarity: 2, w: 2, h: 1, value: 4500 },
-  { name: 'MP5', icon: '🔫', cat: 'weapon', slot: 'weapon', mag: 30, rarity: 2, w: 3, h: 2, value: 7000 },
-  { name: 'Light Body Armor', icon: '🦺', cat: 'gear', slot: 'armor', dur: 25, rarity: 2, w: 2, h: 3, value: 6000 },
-
-  { name: 'Field Medkit', icon: '🩺', cat: 'med', rarity: 3, w: 1, h: 2, value: 9000 },
-  { name: 'Tactical Helmet', icon: '⛑️', cat: 'gear', slot: 'helmet', dur: 38, rarity: 3, w: 2, h: 2, value: 14000 },
-  { name: 'Radio', icon: '📻', cat: 'tech', rarity: 3, w: 2, h: 1, value: 11000 },
-  { name: 'Hard Drive', icon: '💽', cat: 'tech', rarity: 3, w: 1, h: 1, value: 12000 },
-  { name: 'Binoculars', icon: '🔭', cat: 'gear', rarity: 3, w: 2, h: 1, value: 10000 },
-  { name: 'AUG A3', icon: '🔫', cat: 'weapon', slot: 'weapon', mag: 30, rarity: 3, w: 4, h: 2, value: 22000 },
-
-  { name: 'Assault Tactical Vest', icon: '🦺', cat: 'gear', rarity: 4, w: 2, h: 3, value: 28000 },
-  { name: 'Gold Watch', icon: '⌚', cat: 'valuable', rarity: 4, w: 1, h: 1, value: 32000 },
-  { name: 'Night Vision', icon: '🥽', cat: 'gear', rarity: 4, w: 2, h: 1, value: 38000 },
-  { name: 'Laptop', icon: '💻', cat: 'tech', rarity: 4, w: 2, h: 2, value: 45000 },
-  { name: 'M1014 Shotgun', icon: '🔫', cat: 'weapon', slot: 'weapon', mag: 9, rarity: 4, w: 4, h: 1, value: 40000 },
-  { name: 'AK-12', icon: '🔫', cat: 'weapon', slot: 'weapon', mag: 30, rarity: 4, w: 4, h: 2, value: 48000 },
-  { name: 'Desert Eagle', icon: '🔫', cat: 'weapon', slot: 'pistol', mag: 7, rarity: 4, w: 2, h: 1, value: 30000 },
-  { name: 'Heavy Assault Helmet', icon: '⛑️', cat: 'gear', slot: 'helmet', dur: 50, rarity: 4, w: 2, h: 2, value: 52000 },
-  { name: 'Heavy Body Armor', icon: '🦺', cat: 'gear', slot: 'armor', dur: 61, rarity: 4, w: 3, h: 3, value: 65000 },
-
-  { name: 'Gold Bar', icon: '🪙', cat: 'valuable', rarity: 5, w: 1, h: 1, value: 120000 },
-  { name: 'Diamond Ring', icon: '💍', cat: 'valuable', rarity: 5, w: 1, h: 1, value: 150000 },
-  { name: 'Military Server', icon: '🗄️', cat: 'tech', rarity: 5, w: 2, h: 2, value: 180000 },
-  { name: 'M249 LMG', icon: '🔫', cat: 'weapon', slot: 'weapon', mag: 100, rarity: 5, w: 5, h: 2, value: 160000 },
-  { name: 'Encrypted Phone', icon: '📱', cat: 'tech', rarity: 5, w: 1, h: 1, value: 95000 },
-
-  { name: 'Heart of Africa', icon: '💎', cat: 'valuable', rarity: 6, w: 1, h: 1, value: 1200000 },
-  { name: 'Quantum Storage', icon: '🧊', cat: 'tech', rarity: 6, w: 2, h: 2, value: 900000 },
-  { name: 'Ancient Artifact', icon: '🏺', cat: 'valuable', rarity: 6, w: 1, h: 2, value: 750000 },
 ]
+
+// Weapon parts outnumber everything else in the API, so they drop less often per item.
+const CATEGORY_WEIGHT = { part: 0.3 }
 
 const byName = (name) => CATALOG.find((d) => d.name === name)
 
@@ -80,7 +95,7 @@ const BODY_SLOT_CHANCE = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6,
 
 // luck multiplies the weight of Epic and better items.
 const CRATE_TYPES = [
-  { name: 'Weapon Case', icon: '🧳', w: 7, h: 4, count: [3, 6], prefer: ['weapon', 'ammo'], luck: 1.3 },
+  { name: 'Weapon Case', icon: '🧳', w: 7, h: 4, count: [3, 6], prefer: ['weapon', 'ammo', 'part'], luck: 1.3 },
   { name: 'Medical Crate', icon: '🧰', w: 6, h: 4, count: [4, 8], prefer: ['med'], luck: 1 },
   { name: 'Duffel Bag', icon: '👜', w: 6, h: 5, count: [5, 9], prefer: ['misc', 'tech'], luck: 1 },
   { name: 'Safe', icon: '🗃️', w: 4, h: 4, count: [3, 5], prefer: ['valuable'], luck: 3 },
@@ -107,6 +122,7 @@ function pickItem({ prefer = [], luck = 1, slot = null } = {}) {
       let w = RARITY_WEIGHT[def.rarity] / perRarity[def.rarity]
       if (def.rarity >= 4) w *= luck
       if (prefer.includes(def.cat)) w *= 3
+      w *= CATEGORY_WEIGHT[def.cat] ?? 1
       return [def, w]
     }),
   )
@@ -147,10 +163,10 @@ function fillGrid(grid, count, opts) {
 export function createPlayer() {
   const slots = makeSlots('player')
   const equip = (id, name, cond) => slots.find((s) => s.id === id).items.push(makeItem(byName(name), { revealed: true, owned: true, cond }))
-  equip('weapon1', 'AUG A3', 30)
-  equip('weapon2', 'M1014 Shotgun', 8)
-  equip('helmet', 'Tactical Helmet', 29)
-  equip('armor', 'Light Body Armor', 0)
+  equip('weapon1', 'AUG Assault Rifle', 30)
+  equip('weapon2', 'M1014 Shotgun', 6)
+  equip('helmet', 'H07 Tactical Helmet', 29)
+  equip('armor', 'Light Vest', 0)
   equip('melee', 'Combat Knife')
   slots.find((s) => s.id === 'melee').locked = true
 

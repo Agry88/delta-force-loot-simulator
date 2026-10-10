@@ -46,7 +46,8 @@ function onHover(e) {
   >
     <template v-if="item.revealed">
       <span class="name">{{ tn(item.def.name) }}</span>
-      <span class="icon">{{ item.def.icon }}</span>
+      <img v-if="item.def.img" class="img" :src="item.def.img" alt="" draggable="false" loading="lazy" />
+      <span v-else class="icon">{{ item.def.icon }}</span>
       <span class="corner" :class="{ empty: max && mode === 'slot' && item.cond === 0 }">{{ corner }}</span>
     </template>
     <template v-else-if="item.searching">
@@ -112,6 +113,15 @@ function onHover(e) {
   place-items: center;
   font-size: calc(var(--cell) * 0.42);
   filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.6));
+}
+.img {
+  position: absolute;
+  inset: 14px 4px 14px;
+  width: calc(100% - 8px);
+  height: calc(100% - 28px);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.6));
+  pointer-events: none;
 }
 .slot .icon {
   font-size: 38px;
