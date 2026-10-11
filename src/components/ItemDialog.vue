@@ -58,7 +58,30 @@ for (const def of itemRepository.getAll()) {
   if (def.slot && def.img && !ghosts.has(def.slot)) ghosts.set(def.slot, def.img)
 }
 
-// Float beside the item's tile: to its right if there's room, else to its left.
+// Once the player drags the dialog by its header, it stays where they put it.
+let moved = false
+
+function clampLeft(left: number, w: number) {
+  return Math.max(GAP, Math.min(left, window.innerWidth - w - GAP))
+}
+function clampTop(top: number, h: number) {
+  return Math.max(GAP, Math.min(top, window.innerHeight - h - GAP))
+}
+function setPosition(left: number, top: number) {
+  position.value = { left: `${left}px`, top: `${top}px` }
+}
+
+// How much of the inventory and loot panels a dialog at this spot would hide.
+function coveredArea(left: number, top: number, w: number, h: number, panels: DOMRect[]) {
+  return panels.reduce((sum, p) => {
+    const x = Math.min(left + w, p.right) - Math.max(left, p.left)
+    const y = Math.min(top + h, p.bottom) - Math.max(top, p.top)
+    return sum + Math.max(0, x) * Math.max(0, y)
+  }, 0)
+}
+
+// Float beside the item's tile, on whichever side hides less of the item panels,
+// so parts stay reachable for dragging onto the gun.
 function place() {
   const el = dialog.value
   const tile = document.querySelector(`.tile[data-uid="${props.item.uid}"]`)
@@ -66,14 +89,35 @@ function place() {
     position.value = null
     return
   }
+  if (moved) return
   const r = tile.getBoundingClientRect()
   const w = el.offsetWidth
   const h = el.offsetHeight
-  let left = r.right + GAP
-  if (left + w > window.innerWidth - GAP) left = r.left - w - GAP
-  left = Math.max(GAP, Math.min(left, window.innerWidth - w - GAP))
-  const top = Math.max(GAP, Math.min(r.top, window.innerHeight - h - GAP))
-  position.value = { left: `${left}px`, top: `${top}px` }
+  const top = clampTop(r.top, h)
+  const panels = Array.from(document.querySelectorAll('.panel'), (p) => p.getBoundingClientRect())
+  const [best] = [clampLeft(r.right + GAP, w), clampLeft(r.left - w - GAP, w)]
+    .map((left): [number, number] => [left, coveredArea(left, top, w, h, panels)])
+    .sort((a, b) => a[1] - b[1])
+  setPosition(best[0], top)
+}
+
+function startMove(e: PointerEvent) {
+  const el = dialog.value
+  if (!el || window.innerWidth < NARROW) return
+  if (e.target instanceof Element && e.target.closest('button')) return
+  const r = el.getBoundingClientRect()
+  const dx = e.clientX - r.left
+  const dy = e.clientY - r.top
+  const onMove = (m: PointerEvent) => {
+    moved = true
+    setPosition(clampLeft(m.clientX - dx, r.width), clampTop(m.clientY - dy, r.height))
+  }
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+  }
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
 }
 
 // The tile moves when the item does, and when its panel scrolls.
@@ -91,7 +135,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="dialog" class="dialog" :class="`r${item.def.rarity}`" :style="position ?? {}" role="dialog" :aria-label="tn(item.def.name)">
-    <header class="head">
+    <header class="head" @pointerdown="startMove">
       <span class="diamond" />
       <b class="name">{{ tn(item.def.name) }}</b>
       <button class="close" :aria-label="t('item.close')" @click="emit('close')">✕</button>
@@ -148,6 +192,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.6);
 }
 .head {
+  cursor: move;
+  user-select: none;
   display: flex;
   align-items: center;
   gap: 8px;
