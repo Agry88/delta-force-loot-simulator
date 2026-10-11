@@ -4,6 +4,8 @@ export default {
   ui: {
     'start.title': '戰利品模擬器',
     'start.sub': '你有 {seconds} 秒。搜索容器、搶下最好的戰利品，然後撤離。',
+    'start.durationLabel': '時間限制',
+    'start.durationOption': '{seconds} 秒',
     'start.modeLabel': '搜刮目標',
     'start.mode.both': '兩者皆有',
     'start.mode.crate': '戰利品',

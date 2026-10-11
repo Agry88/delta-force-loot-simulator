@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { LOOT_MODES } from '../domain/loot.ts'
+import { RAID_DURATIONS } from '../domain/raid.ts'
 import { t } from '../i18n/index.ts'
 import type { LootMode } from '../domain/models.ts'
-
-interface Props {
-  duration: number
-}
 
 interface Emits {
   start: []
 }
 
-defineProps<Props>()
+const duration = defineModel<number>('duration', { default: 30 })
 const mode = defineModel<LootMode>('mode', { default: 'both' })
 const emit = defineEmits<Emits>()
 </script>
@@ -20,8 +17,21 @@ const emit = defineEmits<Emits>()
   <div class="start">
     <h1>{{ t('start.title') }}</h1>
     <p class="sub">{{ t('start.sub', { seconds: duration }) }}</p>
-    <div class="modes" role="radiogroup" :aria-label="t('start.modeLabel')">
-      <span class="modes-label">{{ t('start.modeLabel') }}</span>
+    <div class="options" role="radiogroup" :aria-label="t('start.durationLabel')">
+      <span class="options-label">{{ t('start.durationLabel') }}</span>
+      <button
+        v-for="d in RAID_DURATIONS"
+        :key="d"
+        role="radio"
+        :aria-checked="duration === d"
+        :class="{ active: duration === d }"
+        @click="duration = d"
+      >
+        {{ t('start.durationOption', { seconds: d }) }}
+      </button>
+    </div>
+    <div class="options" role="radiogroup" :aria-label="t('start.modeLabel')">
+      <span class="options-label">{{ t('start.modeLabel') }}</span>
       <button
         v-for="m in LOOT_MODES"
         :key="m"
@@ -61,7 +71,7 @@ h1 {
   color: var(--text);
   font-size: 18px;
 }
-.modes {
+.options {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -69,13 +79,13 @@ h1 {
   gap: 8px;
   margin-top: 8px;
 }
-.modes-label {
+.options-label {
   width: 100%;
   font-size: 13px;
   color: var(--muted);
   letter-spacing: 0.08em;
 }
-.modes button {
+.options button {
   min-width: 120px;
   padding: 8px 18px;
   font: inherit;
@@ -86,11 +96,11 @@ h1 {
   border: 1px solid #2c353e;
   cursor: pointer;
 }
-.modes button:hover {
+.options button:hover {
   color: var(--text-strong);
   border-color: #4a5560;
 }
-.modes button.active {
+.options button.active {
   color: var(--text-strong);
   background: linear-gradient(180deg, transparent, rgb(58 214 176 / 0.14));
   border-color: var(--accent);

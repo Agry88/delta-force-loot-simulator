@@ -1,5 +1,8 @@
 import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotStorage, SlotType, Storage } from './models.ts'
 
+// Time limits offered on the start screen, in seconds.
+export const RAID_DURATIONS = [15, 30, 60, 120]
+
 // The item plus any parts attached to it.
 function withAttachments(item: Item): Item[] {
   return [item, ...item.attachments.flatMap((s) => s.items)]
