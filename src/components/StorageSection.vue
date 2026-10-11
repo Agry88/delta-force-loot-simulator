@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import GridContainer from './GridContainer.vue'
-import { usedCells } from '../domain/grid.ts'
+import { gridCells, usedCells } from '../domain/grid.ts'
 import { t, tn } from '../i18n/index.ts'
 import type { GridStorage } from '../domain/models.ts'
 
@@ -16,7 +16,7 @@ withDefaults(defineProps<Props>(), { note: '' })
 <template>
   <div class="storage">
     <div class="head">
-      <span>{{ tn(grid.name) }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
+      <span>{{ tn(grid.name) }}: {{ usedCells(grid) }}<small>/{{ gridCells(grid) }}</small></span>
       <span class="q" :title="note || t('storage.size', { w: grid.w, h: grid.h })">?</span>
       <em v-if="note">{{ note }}</em>
     </div>

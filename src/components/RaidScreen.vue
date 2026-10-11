@@ -5,14 +5,14 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
-import { findSlot, findSpot, fits } from '../domain/grid.ts'
-import { carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import { findSlot, findSpot, fits, gridsOf } from '../domain/grid.ts'
+import { canHold, carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
 import { dragState } from '../lib/drag.ts'
 import { hideTooltip, tooltip } from '../lib/tooltip.ts'
-import { t, tn } from '../i18n/index.ts'
+import { t, tn, type UiKey } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
 import type { Item, LootMode, RaidResult, SlotStorage, Storage } from '../domain/models.ts'
 
@@ -34,14 +34,16 @@ const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
-const playerStorages = computed<Storage[]>(() => [...player.slots, ...player.grids])
-const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...loot.value.grids])
+const playerGrids = computed(() => gridsOf(player))
+const lootGrids = computed(() => gridsOf(loot.value))
+const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrids.value])
+const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value])
 const playerSlot = (id: string) => findSlot(player.slots, id)
 const lootSlot = (id: string) => findSlot(loot.value.slots, id)
 
 const earnings = computed(() => lootValue(playerStorages.value))
 const weight = computed(() => carryWeight(playerStorages.value))
-const searching = computed(() => loot.value.grids.some((g) => g.items.some((it) => !it.revealed)))
+const searching = computed(() => lootGrids.value.some((g) => g.items.some((it) => !it.revealed)))
 
 // --- timer -----------------------------------------------------------------
 
@@ -90,9 +92,12 @@ onBeforeUnmount(() => {
 let searchToken = 0
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Bags taken off a body mid-search keep being searched, even after moving on to the next container.
 async function runSearch() {
   const token = ++searchToken
-  const queue = loot.value.grids.flatMap((g) => [...g.items].sort((a, b) => a.y - b.y || a.x - b.x))
+  const queue = [...playerGrids.value, ...lootGrids.value]
+    .flatMap((g) => [...g.items].sort((a, b) => a.y - b.y || a.x - b.x))
+    .filter((it) => !it.revealed)
   for (const item of queue) {
     item.searching = true
     await sleep(SEARCH_TIME[item.def.rarity] * 1000)
@@ -123,7 +128,22 @@ function moveItem(item: Item, from: Storage, to: Storage, x: number, y: number) 
   from.items.splice(from.items.indexOf(item), 1)
   item.x = x
   item.y = y
+  // A bag's contents go wherever the bag goes.
+  if (item.storage) item.storage.owner = to.owner
   to.items.push(item)
+}
+
+// Moves the item into the first target with room for it. False when none has.
+function moveToFirst(item: Item, from: Storage, targets: Storage[]): boolean {
+  for (const target of targets) {
+    if (target === from || !canHold(target, item)) continue
+    const spot = findSpot(target, item.def)
+    if (spot) {
+      moveItem(item, from, target, spot.x, spot.y)
+      return true
+    }
+  }
+  return false
 }
 
 // --- item details ----------------------------------------------------------------
@@ -150,11 +170,7 @@ function showDetails(item: Item) {
 
 // Detaching a part hands it to the player, or drops it in the container when they're full.
 function detach(part: Item, from: SlotStorage) {
-  for (const target of [...player.grids, ...loot.value.grids]) {
-    const spot = findSpot(target, part.def)
-    if (spot) return moveItem(part, from, target, spot.x, spot.y)
-  }
-  flash(t('raid.noSpace'))
+  if (!moveToFirst(part, from, [...playerGrids.value, ...lootGrids.value])) flash(t('raid.noSpace'))
 }
 
 // Equip / pick up / put back the open item. The dialog stays open and follows it.
@@ -162,21 +178,18 @@ function itemAction(action: ItemAction) {
   const item = inspecting.value
   const from = inspectingFrom.value
   if (!item || !from) return
-  for (const target of itemActionTargets(action, player, loot.value)) {
-    if (target === from) continue
-    const spot = findSpot(target, item.def)
-    if (spot) return moveItem(item, from, target, spot.x, spot.y)
-  }
-  flash(t(action === 'equip' ? 'raid.cantEquip' : 'raid.noSpace'))
+  if (moveToFirst(item, from, itemActionTargets(action, player, loot.value))) return
+  flash(t(action === 'equip' ? 'raid.cantEquip' : bagFullMessage(item)))
 }
 
 function quickMove(item: Item, from: Storage) {
   if (!item.revealed || (from.kind === 'slot' && from.locked)) return
-  for (const target of quickMoveTargets(item, from, player, loot.value)) {
-    const spot = findSpot(target, item.def)
-    if (spot) return moveItem(item, from, target, spot.x, spot.y)
-  }
-  flash(t('raid.noSpace'))
+  if (!moveToFirst(item, from, quickMoveTargets(item, from, player, loot.value))) flash(t(bagFullMessage(item)))
+}
+
+// Why an item found no room: a bag with things in it can only be worn.
+function bagFullMessage(item: Item): UiKey {
+  return item.storage?.items.length ? 'raid.bagNotEmpty' : 'raid.noSpace'
 }
 
 interface Drag {
@@ -208,7 +221,8 @@ function onDrop(target: Storage, cx: number, cy: number) {
   const mount = gun && freeAttachmentSlot(gun, item)
   if (mount) return moveItem(item, from, mount, 0, 0)
   if (target === from && target.kind === 'slot') return
-  if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
+  if (!canHold(target, item)) flash(t(target === item.storage ? 'raid.doesntFit' : 'raid.bagNotEmpty'))
+  else if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
   else flash(t(target.kind === 'slot' ? 'raid.cantEquip' : 'raid.doesntFit'))
 }
 
@@ -252,7 +266,12 @@ const tipStyle = computed(() => ({
       <section class="character">
         <div class="figure"><OperatorFigure /></div>
         <div class="equipment">
-          <SlotBox v-for="id in ['helmet', 'armor', 'pistol', 'melee']" :key="id" :slot="playerSlot(id)" v-on="on(playerSlot(id))" />
+          <SlotBox
+            v-for="id in ['helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']"
+            :key="id"
+            :slot="playerSlot(id)"
+            v-on="on(playerSlot(id))"
+          />
           <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="playerSlot(id)" v-on="on(playerSlot(id))" />
         </div>
         <div class="vitals">
@@ -277,7 +296,7 @@ const tipStyle = computed(() => ({
         </div>
         <div class="scroll">
           <StorageSection
-            v-for="g in player.grids"
+            v-for="g in playerGrids"
             :key="g.id"
             :grid="g"
             :note="g.id === 'safebox' ? t('raid.protected') : ''"
@@ -296,13 +315,13 @@ const tipStyle = computed(() => ({
           <div v-if="loot.slots.length" class="loot-gear">
             <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="lootSlot(id)" v-on="on(lootSlot(id))" />
             <SlotBox
-              v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
+              v-for="id in ['helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']"
               :key="id"
               :slot="lootSlot(id)"
               v-on="on(lootSlot(id))"
             />
           </div>
-          <StorageSection v-for="g in loot.grids" :key="g.id" :grid="g" v-on="on(g)" />
+          <StorageSection v-for="g in lootGrids" :key="g.id" :grid="g" v-on="on(g)" />
           <button class="next" @click="nextContainer">{{ t('raid.next') }}</button>
         </div>
       </section>

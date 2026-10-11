@@ -31,6 +31,7 @@ export default {
     'raid.noSpace': '空間不足',
     'raid.cantEquip': '無法裝備在此欄位',
     'raid.doesntFit': '放不下',
+    'raid.bagNotEmpty': '請先清空背包',
 
     'item.equip': '裝備',
     'item.unequip': '卸下',
@@ -38,6 +39,7 @@ export default {
     'item.putBack': '放回',
     'item.attachments': '槍械配件',
     'item.close': '關閉',
+    'item.capacity': '{n} 格',
 
     'storage.size': '{w}×{h} 格空間',
 

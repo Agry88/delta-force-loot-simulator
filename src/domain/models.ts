@@ -2,7 +2,7 @@ export type Rarity = 1 | 2 | 3 | 4 | 5 | 6
 
 export type Category = 'weapon' | 'part' | 'gear' | 'ammo' | 'med' | 'tech' | 'valuable' | 'misc'
 
-export type GearSlot = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'melee'
+export type GearSlot = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'melee' | 'rig' | 'backpack'
 
 // Which kind of part a gun's attachment slot takes.
 export type PartSlot =
@@ -28,7 +28,7 @@ export type LootMode = 'both' | 'crate' | 'body'
 export type Owner = 'player' | 'loot'
 
 // w/h are grid cells; value is the base price before random variance.
-// dur: max durability (helmets/armor); mag: magazine size (guns).
+// dur: max durability (helmets/armor); mag: magazine size (guns); capacity: storage cells (rigs/backpacks).
 export interface ItemDef {
   name: string
   img?: string
@@ -41,6 +41,7 @@ export interface ItemDef {
   value: number
   mag?: number
   dur?: number
+  capacity?: number
 }
 
 export interface Item {
@@ -56,6 +57,8 @@ export interface Item {
   owned: boolean
   // A gun's attachment slots; empty for everything else.
   attachments: SlotStorage[]
+  // What a chest rig or backpack holds; it travels with the bag.
+  storage: GridStorage | null
 }
 
 export interface SlotStorage {
@@ -78,11 +81,14 @@ export interface GridStorage {
   w: number
   h: number
   icon: string | null
+  // Usable cells, filled row by row; the rest of the last row is blocked. Defaults to w × h.
+  cells?: number
   items: Item[]
 }
 
 export type Storage = SlotStorage | GridStorage
 
+// Rig and backpack grids live on the items in those slots; grids are the fixed ones (pockets, safebox, crates).
 export interface Player {
   slots: SlotStorage[]
   grids: GridStorage[]

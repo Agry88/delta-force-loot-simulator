@@ -4,7 +4,7 @@ import ItemTile from './ItemTile.vue'
 import { tn } from '../i18n/index.ts'
 import type { Item, SlotStorage, SlotType } from '../domain/models.ts'
 
-const PLACEHOLDER: Partial<Record<SlotType, string>> = { weapon: '🔫', helmet: '⛑️', armor: '🦺', pistol: '🔫', melee: '🔪' }
+const PLACEHOLDER: Partial<Record<SlotType, string>> = { weapon: '🔫', helmet: '⛑️', armor: '🦺', rig: '🎽', backpack: '🎒', pistol: '🔫', melee: '🔪' }
 
 interface Props {
   slot: SlotStorage

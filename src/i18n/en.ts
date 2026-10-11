@@ -29,6 +29,7 @@ export default {
     'raid.noSpace': 'Not enough space',
     'raid.cantEquip': "Can't equip that here",
     'raid.doesntFit': "Doesn't fit there",
+    'raid.bagNotEmpty': 'Empty the bag first',
 
     'item.equip': 'Equip',
     'item.unequip': 'Unequip',
@@ -36,6 +37,7 @@ export default {
     'item.putBack': 'Put Back',
     'item.attachments': 'Weapon Attachments',
     'item.close': 'Close',
+    'item.capacity': '{n} slots',
 
     'storage.size': '{w}×{h} storage',
 

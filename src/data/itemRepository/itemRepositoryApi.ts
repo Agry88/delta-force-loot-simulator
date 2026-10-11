@@ -4,7 +4,7 @@ import type { ItemRepository } from './itemRepository.ts'
 import catalog from './catalog.json'
 
 // Real items, prices and icons snapshotted from deltaforceapi.com by `pnpm sync-items`.
-// Each entry: { id, name, type, sub, quality, w, h, price } with w/h in grid cells.
+// Each entry: { id, name, type, sub, quality, w, h, price, capacity? } with w/h in grid cells.
 type CatalogEntry = (typeof catalog.items)[number]
 
 const ICON_URL = (id: string) => `https://cdn.deltaforceapi.com/deltaforceapi/item/${id}/icon.png`
@@ -37,6 +37,8 @@ const SLOT_BY_SUB: Record<string, SlotType> = {
   WEAPON_PISTOL: 'pistol',
   GEAR_HELMET: 'helmet',
   GEAR_VEST: 'armor',
+  GEAR_CHEST_RIG: 'rig',
+  GEAR_BACKPACK: 'backpack',
   // Weapon parts, by the attachment slot they mount in. Other part types can't be attached.
   PART_REAR_GRIP: 'rearGrip',
   PART_BARREL: 'barrel',
@@ -70,6 +72,7 @@ function toDef(it: CatalogEntry): ItemDef {
     value: it.price,
     mag: MAG_SIZE[it.sub],
     dur: slot === 'helmet' || slot === 'armor' ? DURABILITY[rarity] : undefined,
+    capacity: it.capacity,
   }
 }
 

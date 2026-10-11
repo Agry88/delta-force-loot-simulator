@@ -147,6 +147,7 @@ onBeforeUnmount(() => {
       <span v-else class="picture emoji">{{ item.def.icon }}</span>
       <div class="specs">
         <span>{{ itemWeight(item).toFixed(2) }}KG</span>
+        <span v-if="item.def.capacity">{{ t('item.capacity', { n: item.def.capacity }) }}</span>
         <span class="size" :style="{ '--w': item.def.w }">
           <i v-for="n in sizeCells" :key="n" />
         </span>

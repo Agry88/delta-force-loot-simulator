@@ -1,8 +1,8 @@
 // Storage helpers. Two kinds of storage hold items:
-//   grid: { kind: 'grid', w, h, items } — items sit at x/y and take def.w × def.h cells
+//   grid: { kind: 'grid', w, h, cells?, items } — items sit at x/y and take def.w × def.h cells
 //   slot: { kind: 'slot', accepts, locked?, items } — holds one item whose def.slot matches
 
-import type { GridStorage, Item, ItemDef, SlotStorage, Storage } from './models.ts'
+import type { GridStorage, Item, ItemDef, Player, SlotStorage, Storage } from './models.ts'
 
 interface Spot {
   x: number
@@ -15,11 +15,26 @@ export function findSlot(slots: SlotStorage[], id: string): SlotStorage {
   return slot
 }
 
+// How many cells the grid can use; a bag's last row may be partly blocked.
+export function gridCells(grid: GridStorage): number {
+  return grid.cells ?? grid.w * grid.h
+}
+
+// Every grid on a player or body in panel order, with the worn rig and backpack around the pockets.
+export function gridsOf(p: Player): GridStorage[] {
+  const bag = (id: string) => p.slots.find((s) => s.id === id)?.items[0]?.storage ?? null
+  return p.grids
+    .flatMap((g) => (g.id === 'pockets' ? [bag('rig'), g, bag('backpack')] : [g]))
+    .filter((g): g is GridStorage => g !== null)
+}
+
 export function fits(target: Storage, def: ItemDef, x: number, y: number, ignore: Item | null = null): boolean {
   if (target.kind === 'slot') {
     return !target.locked && def.slot === target.accepts && target.items.every((it) => it === ignore)
   }
   if (x < 0 || y < 0 || x + def.w > target.w || y + def.h > target.h) return false
+  // Blocked cells sit at the end of the last row, so checking the bottom-right corner is enough.
+  if ((y + def.h - 1) * target.w + x + def.w > gridCells(target)) return false
   return target.items.every(
     (it) =>
       it === ignore ||
