@@ -1,6 +1,6 @@
 import type { ItemRepository } from '../data/itemRepository/itemRepository.ts'
 import { findSlot, randomSpot } from './grid.ts'
-import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, Player, Rarity, SlotStorage, SlotType } from './models.ts'
+import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, PartSlot, Player, Rarity, SlotStorage, SlotType } from './models.ts'
 import { RARITY_WEIGHT } from './rarity.ts'
 
 export const LOOT_MODES: LootMode[] = ['both', 'crate', 'body']
@@ -17,6 +17,39 @@ const SLOTS: Pick<SlotStorage, 'id' | 'name' | 'accepts' | 'label' | 'wide'>[] =
   { id: 'pistol', name: 'Pistol', accepts: 'pistol' },
   { id: 'melee', name: 'Melee', accepts: 'melee' },
 ]
+
+interface AttachmentSlot {
+  id: string
+  name: string
+  accepts: PartSlot
+}
+
+// A rifle's attachment slots, in the order the attachment screen lists them.
+const ATTACHMENT_SLOTS: AttachmentSlot[] = [
+  { id: 'rearGrip', name: 'Rear Grip', accepts: 'rearGrip' },
+  { id: 'barrel', name: 'Barrel', accepts: 'barrel' },
+  { id: 'muzzle', name: 'Muzzle', accepts: 'muzzle' },
+  { id: 'stock', name: 'Stock', accepts: 'stock' },
+  { id: 'foregrip', name: 'Foregrip', accepts: 'foregrip' },
+  { id: 'bipod', name: 'Rail Bipod', accepts: 'bipod' },
+  { id: 'topRail', name: 'Top Rail', accepts: 'rail' },
+  { id: 'leftRail', name: 'Left Rail', accepts: 'tactical' },
+  { id: 'rightRail', name: 'Right Rail', accepts: 'tactical' },
+  { id: 'topPanel', name: 'Top Panel', accepts: 'panel' },
+  { id: 'leftPanel', name: 'Left Panel', accepts: 'panel' },
+  { id: 'rightPanel', name: 'Right Panel', accepts: 'panel' },
+  { id: 'magazine', name: 'Magazine', accepts: 'magazine' },
+  { id: 'magWell', name: 'Mag Well', accepts: 'magWell' },
+  { id: 'optic', name: 'Optic', accepts: 'sight' },
+  { id: 'sideSight', name: 'Side Sight', accepts: 'sight' },
+]
+const PISTOL_ATTACHMENTS = ['rearGrip', 'barrel', 'muzzle', 'rightRail', 'magazine', 'optic']
+
+// These parts only fit one gun family, so random rolls only use parts named after the gun (e.g. "AKM 40-Round Extended Mag").
+const GUN_SPECIFIC: PartSlot[] = ['barrel', 'stock', 'magazine']
+
+// Chance each attachment slot comes filled.
+const ATTACHMENT_CHANCE = 0.35
 
 // Chance an enemy body has something in each slot.
 const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, pistol: 0.45, melee: 0.5 }
@@ -64,6 +97,13 @@ interface MakeItemOptions {
   cond?: number
 }
 
+function makeAttachmentSlots(def: ItemDef): SlotStorage[] {
+  if (def.slot !== 'weapon' && def.slot !== 'pistol') return []
+  const slots = def.slot === 'pistol' ? ATTACHMENT_SLOTS.filter((s) => PISTOL_ATTACHMENTS.includes(s.id)) : ATTACHMENT_SLOTS
+  // Owner is unused here: detaching a part always hands it to the player.
+  return slots.map((s) => ({ ...s, kind: 'slot', owner: 'player', items: [] }))
+}
+
 function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false, cond }: MakeItemOptions = {}): Item {
   const max = def.dur ?? def.mag
   return {
@@ -77,6 +117,7 @@ function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false,
     revealed,
     searching: false,
     owned,
+    attachments: makeAttachmentSlots(def),
   }
 }
 
@@ -102,7 +143,7 @@ export class LootGenerator {
     const slots = makeSlots('player')
     const slot = (id: string) => findSlot(slots, id)
     const equip = (id: string, name: string, cond?: number) =>
-      slot(id).items.push(makeItem(this.items.getByName(name), { revealed: true, owned: true, cond }))
+      slot(id).items.push(this.attachParts(makeItem(this.items.getByName(name), { revealed: true, owned: true, cond })))
     equip('weapon1', 'AUG Assault Rifle', 30)
     equip('weapon2', 'M1014 Shotgun', 6)
     equip('helmet', 'H07 Tactical Helmet', 29)
@@ -142,11 +183,29 @@ export class LootGenerator {
     )
   }
 
+  // A part for one of the gun's attachment slots, or null when none fits.
+  private pickPart(gun: ItemDef, slot: SlotType): ItemDef | null {
+    const family = `${gun.name.split(' ')[0]} `
+    const specific = GUN_SPECIFIC.some((s) => s === slot)
+    const parts = this.items.getAll().filter((def) => def.slot === slot && (!specific || def.name.startsWith(family)))
+    return parts.length ? pickWeighted(parts.map((def): [ItemDef, number] => [def, RARITY_WEIGHT[def.rarity]])) : null
+  }
+
+  // Fills some of a gun's attachment slots. Parts come revealed and owned along with the gun.
+  private attachParts(gun: Item): Item {
+    for (const slot of gun.attachments) {
+      if (Math.random() >= ATTACHMENT_CHANCE) continue
+      const def = this.pickPart(gun.def, slot.accepts)
+      if (def) slot.items.push(makeItem(def, { revealed: true, owned: gun.owned }))
+    }
+    return gun
+  }
+
   private fillGrid(grid: GridStorage, count: number, opts: PickOptions) {
     for (let attempt = 0; attempt < count * 4 && grid.items.length < count; attempt++) {
       const def = this.pickItem(opts)
       const spot = randomSpot(grid, def)
-      if (spot) grid.items.push(makeItem(def, spot))
+      if (spot) grid.items.push(this.attachParts(makeItem(def, spot)))
     }
   }
 
@@ -154,7 +213,7 @@ export class LootGenerator {
     const slots = makeSlots('loot')
     for (const slot of slots) {
       if (Math.random() < BODY_SLOT_CHANCE[slot.id]) {
-        slot.items.push(makeItem(this.pickItem({ slot: slot.accepts }), { revealed: true }))
+        slot.items.push(this.attachParts(makeItem(this.pickItem({ slot: slot.accepts }), { revealed: true })))
       }
     }
     const grids = [makeGrid('loot', 'rig', 'Chest Rig', 7, 2, '🦺'), makeGrid('loot', 'pockets', 'Pockets', 5, 1)]

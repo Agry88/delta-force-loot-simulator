@@ -2,8 +2,25 @@ export type Rarity = 1 | 2 | 3 | 4 | 5 | 6
 
 export type Category = 'weapon' | 'part' | 'gear' | 'ammo' | 'med' | 'tech' | 'valuable' | 'misc'
 
-// Which equipment slot an item can go in.
-export type SlotType = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'melee'
+export type GearSlot = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'melee'
+
+// Which kind of part a gun's attachment slot takes.
+export type PartSlot =
+  | 'rearGrip'
+  | 'barrel'
+  | 'muzzle'
+  | 'stock'
+  | 'foregrip'
+  | 'bipod'
+  | 'rail'
+  | 'tactical'
+  | 'panel'
+  | 'magazine'
+  | 'magWell'
+  | 'sight'
+
+// Which slot an item can go in: an equipment slot, or an attachment slot on a gun.
+export type SlotType = GearSlot | PartSlot
 
 // What a raid can turn up.
 export type LootMode = 'both' | 'crate' | 'body'
@@ -37,6 +54,8 @@ export interface Item {
   revealed: boolean
   searching: boolean
   owned: boolean
+  // A gun's attachment slots; empty for everything else.
+  attachments: SlotStorage[]
 }
 
 export interface SlotStorage {

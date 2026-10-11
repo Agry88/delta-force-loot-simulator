@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from 'vue'
 import OperatorFigure from './OperatorFigure.vue'
 import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
+import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSlot, findSpot, fits } from '../domain/grid.ts'
-import { carryWeight, lootValue, quickMoveTargets, raidResult } from '../domain/raid.ts'
+import { carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
+import { dragState } from '../lib/drag.ts'
 import { hideTooltip, tooltip } from '../lib/tooltip.ts'
 import { t, tn } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
-import type { Item, LootMode, RaidResult, Storage } from '../domain/models.ts'
+import type { Item, LootMode, RaidResult, SlotStorage, Storage } from '../domain/models.ts'
 
 interface Props {
   duration: number
@@ -32,6 +35,7 @@ const remaining = ref(props.duration)
 const toast = ref('')
 
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...player.grids])
+const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...loot.value.grids])
 const playerSlot = (id: string) => findSlot(player.slots, id)
 const lootSlot = (id: string) => findSlot(loot.value.slots, id)
 
@@ -60,18 +64,23 @@ function finish() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') finish()
+  if (e.key !== 'Escape') return
+  if (inspecting.value) closeDetails()
+  else finish()
 }
 
 onMounted(() => {
   endAt = performance.now() + props.duration * 1000
   timerId = setInterval(tick, 100)
   window.addEventListener('keydown', onKey)
+  // A drag dropped outside any storage still has to end.
+  window.addEventListener('dragend', endDrag)
   runSearch()
 })
 onBeforeUnmount(() => {
   clearInterval(timerId)
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('dragend', endDrag)
   searchToken++
   hideTooltip()
 })
@@ -117,6 +126,50 @@ function moveItem(item: Item, from: Storage, to: Storage, x: number, y: number) 
   to.items.push(item)
 }
 
+// --- item details ----------------------------------------------------------------
+
+// The item whose detail dialog is open, floating beside it.
+const inspecting = ref<Item | null>(null)
+const inspectingFrom = computed(() => (inspecting.value ? storageOf(inspecting.value, allStorages.value) : null))
+
+// Close when the item goes away, e.g. the container it was in is swapped for the next one.
+watchEffect(() => {
+  if (inspecting.value && !inspectingFrom.value) inspecting.value = null
+})
+
+function closeDetails() {
+  hideTooltip()
+  inspecting.value = null
+}
+
+function showDetails(item: Item) {
+  if (!item.revealed) return
+  hideTooltip()
+  inspecting.value = item
+}
+
+// Detaching a part hands it to the player, or drops it in the container when they're full.
+function detach(part: Item, from: SlotStorage) {
+  for (const target of [...player.grids, ...loot.value.grids]) {
+    const spot = findSpot(target, part.def)
+    if (spot) return moveItem(part, from, target, spot.x, spot.y)
+  }
+  flash(t('raid.noSpace'))
+}
+
+// Equip / pick up / put back the open item. The dialog stays open and follows it.
+function itemAction(action: ItemAction) {
+  const item = inspecting.value
+  const from = inspectingFrom.value
+  if (!item || !from) return
+  for (const target of itemActionTargets(action, player, loot.value)) {
+    if (target === from) continue
+    const spot = findSpot(target, item.def)
+    if (spot) return moveItem(item, from, target, spot.x, spot.y)
+  }
+  flash(t(action === 'equip' ? 'raid.cantEquip' : 'raid.noSpace'))
+}
+
 function quickMove(item: Item, from: Storage) {
   if (!item.revealed || (from.kind === 'slot' && from.locked)) return
   for (const target of quickMoveTargets(item, from, player, loot.value)) {
@@ -135,12 +188,25 @@ interface Drag {
 }
 
 let drag: Drag | null = null
+function startDrag(item: Item, from: Storage, gx: number, gy: number) {
+  drag = { item, from, gx, gy }
+  dragState.item = item
+}
+function endDrag() {
+  drag = null
+  dragState.item = null
+}
+
 function onDrop(target: Storage, cx: number, cy: number) {
   if (!drag) return
   const { item, from, gx, gy } = drag
-  drag = null
+  endDrag()
   const x = target.kind === 'slot' ? 0 : cx - gx
   const y = target.kind === 'slot' ? 0 : cy - gy
+  // A part dropped on a gun with a free slot for it goes onto the gun.
+  const gun = itemAt(target, cx, cy)
+  const mount = gun && freeAttachmentSlot(gun, item)
+  if (mount) return moveItem(item, from, mount, 0, 0)
   if (target === from && target.kind === 'slot') return
   if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
   else flash(t(target.kind === 'slot' ? 'raid.cantEquip' : 'raid.doesntFit'))
@@ -149,8 +215,12 @@ function onDrop(target: Storage, cx: number, cy: number) {
 // Event handlers for one storage (grid or slot), spread onto its component.
 function on(storage: Storage) {
   return {
-    'item-click': (item: Item) => quickMove(item, storage),
-    'drag-start': (item: Item, gx: number, gy: number) => (drag = { item, from: storage, gx, gy }),
+    'item-click': showDetails,
+    'item-dblclick': (item: Item) => {
+      closeDetails()
+      quickMove(item, storage)
+    },
+    'drag-start': (item: Item, gx: number, gy: number) => startDrag(item, storage, gx, gy),
     'drop-at': (cx: number, cy: number) => onDrop(storage, cx, cy),
   }
 }
@@ -239,7 +309,8 @@ const tipStyle = computed(() => ({
     </main>
 
     <footer class="hints">
-      <span><kbd>LMB</kbd> {{ t('raid.hintQuickMove') }}</span>
+      <span><kbd>LMB</kbd> {{ t('raid.hintDetails') }}</span>
+      <span><kbd>LMB×2</kbd> {{ t('raid.hintQuickMove') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintCarry') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintEquip') }}</span>
       <button class="extract" @click="finish"><kbd>Esc</kbd> {{ t('raid.extract') }}</button>
@@ -250,6 +321,18 @@ const tipStyle = computed(() => ({
       <div class="tip-rarity" :class="`r${tooltip.item.def.rarity}`">{{ tn(RARITIES[tooltip.item.def.rarity]) }}</div>
       <div class="tip-value"><span class="coin" /> {{ formatValue(tooltip.item.value) }}</div>
     </div>
+
+    <ItemDialog
+      v-if="inspecting && inspectingFrom"
+      :key="inspecting.uid"
+      :item="inspecting"
+      :from="inspectingFrom"
+      @close="closeDetails"
+      @action="itemAction"
+      @part-dblclick="(slot, part) => detach(part, slot)"
+      @drag-start="(slot, item, gx, gy) => on(slot)['drag-start'](item, gx, gy)"
+      @drop-at="(slot) => onDrop(slot, 0, 0)"
+    />
 
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>

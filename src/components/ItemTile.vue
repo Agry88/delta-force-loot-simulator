@@ -2,7 +2,9 @@
 import { computed, useTemplateRef } from 'vue'
 import { SEARCH_TIME } from '../domain/rarity.ts'
 import { formatShort } from '../lib/format.ts'
+import { dragState } from '../lib/drag.ts'
 import { hideTooltip, showTooltip } from '../lib/tooltip.ts'
+import { freeAttachmentSlot } from '../domain/raid.ts'
 import { tn } from '../i18n/index.ts'
 import type { Item } from '../domain/models.ts'
 
@@ -25,6 +27,8 @@ const emit = defineEmits<Emits>()
 const tile = useTemplateRef('tile')
 
 const max = computed(() => props.item.def.dur ?? props.item.def.mag)
+// While a part is dragged, guns with a free slot for it light up as drop targets.
+const attachable = computed(() => !!dragState.item && props.item.revealed && !!freeAttachmentSlot(props.item, dragState.item))
 const corner = computed(() => {
   if (props.mode === 'slot' && max.value) return `${props.item.cond}/${max.value}`
   return formatShort(props.item.value)
@@ -50,7 +54,8 @@ function onHover(e: MouseEvent) {
   <div
     ref="tile"
     class="tile"
-    :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked }]"
+    :data-uid="item.uid"
+    :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked, attachable }]"
     :draggable="item.revealed && !locked"
     @dragstart="onDragStart"
     @mouseenter="onHover"
@@ -91,6 +96,10 @@ function onHover(e: MouseEvent) {
   height: 100%;
   background: linear-gradient(160deg, color-mix(in srgb, var(--rc) 26%, #1a2026), #141a1f);
   border-color: color-mix(in srgb, var(--rc) 40%, #2a333c);
+}
+.tile.attachable {
+  border-color: #fff;
+  box-shadow: inset 0 0 0 999px rgb(255 255 255 / 0.22);
 }
 .tile.locked {
   cursor: default;
