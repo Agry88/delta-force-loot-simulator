@@ -6,8 +6,7 @@ import ResultScreen from './components/ResultScreen.vue'
 import LangToggle from './components/LangToggle.vue'
 import type { LootMode, RaidResult } from './domain/models.ts'
 
-const RAID_SECONDS = 30
-
+const duration = ref(30)
 const mode = ref<LootMode>('both')
 const phase = ref<'start' | 'raid' | 'result'>('start')
 const result = ref<RaidResult | null>(null)
@@ -19,8 +18,8 @@ function onFinish(r: RaidResult) {
 </script>
 
 <template>
-  <StartScreen v-if="phase === 'start'" v-model:mode="mode" :duration="RAID_SECONDS" @start="phase = 'raid'" />
-  <RaidScreen v-else-if="phase === 'raid'" :duration="RAID_SECONDS" :mode="mode" @finish="onFinish" />
+  <StartScreen v-if="phase === 'start'" v-model:mode="mode" v-model:duration="duration" @start="phase = 'raid'" />
+  <RaidScreen v-else-if="phase === 'raid'" :duration="duration" :mode="mode" @finish="onFinish" />
   <ResultScreen v-else-if="result" :result="result" @restart="phase = 'raid'" />
   <LangToggle v-if="phase !== 'raid'" class="corner-lang" />
 </template>

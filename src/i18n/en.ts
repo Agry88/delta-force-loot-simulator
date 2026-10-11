@@ -2,6 +2,8 @@ export default {
   ui: {
     'start.title': 'LOOT SIMULATOR',
     'start.sub': 'You have {seconds} seconds. Search containers, grab the best loot, extract.',
+    'start.durationLabel': 'TIME LIMIT',
+    'start.durationOption': '{seconds}s',
     'start.modeLabel': 'LOOT FROM',
     'start.mode.both': 'Both',
     'start.mode.crate': 'Crates',
