@@ -6,10 +6,11 @@ import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSlot, findSpot, fits } from '../domain/grid.ts'
-import { carryWeight, itemActionTargets, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import { carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
+import { dragState } from '../lib/drag.ts'
 import { hideTooltip, tooltip } from '../lib/tooltip.ts'
 import { t, tn } from '../i18n/index.ts'
 import LangToggle from './LangToggle.vue'
@@ -72,11 +73,14 @@ onMounted(() => {
   endAt = performance.now() + props.duration * 1000
   timerId = setInterval(tick, 100)
   window.addEventListener('keydown', onKey)
+  // A drag dropped outside any storage still has to end.
+  window.addEventListener('dragend', endDrag)
   runSearch()
 })
 onBeforeUnmount(() => {
   clearInterval(timerId)
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('dragend', endDrag)
   searchToken++
   hideTooltip()
 })
@@ -184,12 +188,25 @@ interface Drag {
 }
 
 let drag: Drag | null = null
+function startDrag(item: Item, from: Storage, gx: number, gy: number) {
+  drag = { item, from, gx, gy }
+  dragState.item = item
+}
+function endDrag() {
+  drag = null
+  dragState.item = null
+}
+
 function onDrop(target: Storage, cx: number, cy: number) {
   if (!drag) return
   const { item, from, gx, gy } = drag
-  drag = null
+  endDrag()
   const x = target.kind === 'slot' ? 0 : cx - gx
   const y = target.kind === 'slot' ? 0 : cy - gy
+  // A part dropped on a gun with a free slot for it goes onto the gun.
+  const gun = itemAt(target, cx, cy)
+  const mount = gun && freeAttachmentSlot(gun, item)
+  if (mount) return moveItem(item, from, mount, 0, 0)
   if (target === from && target.kind === 'slot') return
   if (fits(target, item.def, x, y, item)) moveItem(item, from, target, x, y)
   else flash(t(target.kind === 'slot' ? 'raid.cantEquip' : 'raid.doesntFit'))
@@ -203,7 +220,7 @@ function on(storage: Storage) {
       closeDetails()
       quickMove(item, storage)
     },
-    'drag-start': (item: Item, gx: number, gy: number) => (drag = { item, from: storage, gx, gy }),
+    'drag-start': (item: Item, gx: number, gy: number) => startDrag(item, storage, gx, gy),
     'drop-at': (cx: number, cy: number) => onDrop(storage, cx, cy),
   }
 }

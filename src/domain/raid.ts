@@ -1,4 +1,4 @@
-import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotType, Storage } from './models.ts'
+import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotStorage, SlotType, Storage } from './models.ts'
 
 // The item plus any parts attached to it.
 function withAttachments(item: Item): Item[] {
@@ -30,6 +30,18 @@ export function carryWeight(storages: Storage[]): number {
 // Which storage holds the item, if any of them does.
 export function storageOf(item: Item, storages: Storage[]): Storage | null {
   return storages.find((s) => s.items.includes(item)) ?? null
+}
+
+// The first free attachment slot on the gun that takes this part, if any.
+export function freeAttachmentSlot(gun: Item, part: Item): SlotStorage | null {
+  if (gun === part) return null
+  return gun.attachments.find((s) => !s.items.length && s.accepts === part.def.slot) ?? null
+}
+
+// The item covering a storage cell (a slot has just the one).
+export function itemAt(storage: Storage, cx: number, cy: number): Item | null {
+  if (storage.kind === 'slot') return storage.items[0] ?? null
+  return storage.items.find((it) => cx >= it.x && cx < it.x + it.def.w && cy >= it.y && cy < it.y + it.def.h) ?? null
 }
 
 const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'pistol', 'melee']
