@@ -5,7 +5,7 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
-import { findSlot, findSpot, fits, gridsOf } from '../domain/grid.ts'
+import { findSlot, findSpot, fits, gridsOf, sectionsOf } from '../domain/grid.ts'
 import { canHold, carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
@@ -34,6 +34,8 @@ const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
+const playerSections = computed(() => sectionsOf(player))
+const lootSections = computed(() => sectionsOf(loot.value))
 const playerGrids = computed(() => gridsOf(player))
 const lootGrids = computed(() => gridsOf(loot.value))
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrids.value])
@@ -267,7 +269,7 @@ const tipStyle = computed(() => ({
         <div class="figure"><OperatorFigure /></div>
         <div class="equipment">
           <SlotBox
-            v-for="id in ['helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']"
+            v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
             :key="id"
             :slot="playerSlot(id)"
             v-on="on(playerSlot(id))"
@@ -296,12 +298,17 @@ const tipStyle = computed(() => ({
         </div>
         <div class="scroll">
           <StorageSection
-            v-for="g in playerGrids"
-            :key="g.id"
-            :grid="g"
-            :note="g.id === 'safebox' ? t('raid.protected') : ''"
-            v-on="on(g)"
-          />
+            v-for="s in playerSections"
+            :key="s.id"
+            :name="s.name"
+            :grid="s.grid"
+            :note="s.id === 'safebox' ? t('raid.protected') : ''"
+            v-on="s.grid ? on(s.grid) : {}"
+          >
+            <template v-if="s.slot" #icon>
+              <SlotBox class="bag" :slot="s.slot" v-on="on(s.slot)" />
+            </template>
+          </StorageSection>
         </div>
       </section>
 
@@ -315,13 +322,17 @@ const tipStyle = computed(() => ({
           <div v-if="loot.slots.length" class="loot-gear">
             <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="lootSlot(id)" v-on="on(lootSlot(id))" />
             <SlotBox
-              v-for="id in ['helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']"
+              v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
               :key="id"
               :slot="lootSlot(id)"
               v-on="on(lootSlot(id))"
             />
           </div>
-          <StorageSection v-for="g in lootGrids" :key="g.id" :grid="g" v-on="on(g)" />
+          <StorageSection v-for="s in lootSections" :key="s.id" :name="s.name" :grid="s.grid" v-on="s.grid ? on(s.grid) : {}">
+            <template v-if="s.slot" #icon>
+              <SlotBox class="bag" :slot="s.slot" v-on="on(s.slot)" />
+            </template>
+          </StorageSection>
           <button class="next" @click="nextContainer">{{ t('raid.next') }}</button>
         </div>
       </section>
@@ -578,6 +589,10 @@ kbd {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+}
+.bag {
+  --slot: calc(var(--cell) * 2);
+  flex: none;
 }
 .next {
   display: block;

@@ -20,12 +20,27 @@ export function gridCells(grid: GridStorage): number {
   return grid.cells ?? grid.w * grid.h
 }
 
-// Every grid on a player or body in panel order, with the worn rig and backpack around the pockets.
+// One storage panel: a grid, or a rig/backpack slot with the grid of the bag worn in it (none when empty).
+export interface Section {
+  id: string
+  name: string
+  slot: SlotStorage | null
+  grid: GridStorage | null
+}
+
+// The storage panels of a player or body in order, with the rig and backpack around the pockets.
+export function sectionsOf(p: Player): Section[] {
+  const bag = (id: string): Section[] => {
+    const slot = p.slots.find((s) => s.id === id)
+    return slot ? [{ id, name: slot.name, slot, grid: slot.items[0]?.storage ?? null }] : []
+  }
+  const plain = (g: GridStorage): Section => ({ id: g.id, name: g.name, slot: null, grid: g })
+  return p.grids.flatMap((g) => (g.id === 'pockets' ? [...bag('rig'), plain(g), ...bag('backpack')] : [plain(g)]))
+}
+
+// Every grid that can hold items on a player or body, in panel order.
 export function gridsOf(p: Player): GridStorage[] {
-  const bag = (id: string) => p.slots.find((s) => s.id === id)?.items[0]?.storage ?? null
-  return p.grids
-    .flatMap((g) => (g.id === 'pockets' ? [bag('rig'), g, bag('backpack')] : [g]))
-    .filter((g): g is GridStorage => g !== null)
+  return sectionsOf(p).flatMap((s) => (s.grid ? [s.grid] : []))
 }
 
 export function fits(target: Storage, def: ItemDef, x: number, y: number, ignore: Item | null = null): boolean {
