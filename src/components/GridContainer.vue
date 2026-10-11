@@ -9,6 +9,7 @@ interface Props {
 
 interface Emits {
   'item-click': [item: Item]
+  'item-dblclick': [item: Item]
   'drag-start': [item: Item, gx: number, gy: number]
   'drop-at': [cx: number, cy: number]
 }
@@ -34,6 +35,7 @@ function onDrop(e: DragEvent) {
       class="placed"
       :style="{ '--x': item.x, '--y': item.y, '--iw': item.def.w, '--ih': item.def.h }"
       @click="emit('item-click', item)"
+      @dblclick="emit('item-dblclick', item)"
       @grab="(gx, gy) => emit('drag-start', item, gx, gy)"
     />
   </div>

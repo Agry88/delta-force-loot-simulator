@@ -3,11 +3,11 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from
 import OperatorFigure from './OperatorFigure.vue'
 import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
-import WeaponDialog from './WeaponDialog.vue'
+import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSlot, findSpot, fits } from '../domain/grid.ts'
-import { carryWeight, freeAttachmentSlot, gunActionTargets, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
-import type { GunAction } from '../domain/raid.ts'
+import { carryWeight, itemActionTargets, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
 import { hideTooltip, tooltip } from '../lib/tooltip.ts'
@@ -64,7 +64,7 @@ function finish() {
 
 function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
-  if (modding.value) closeMods()
+  if (inspecting.value) closeDetails()
   else finish()
 }
 
@@ -122,33 +122,26 @@ function moveItem(item: Item, from: Storage, to: Storage, x: number, y: number) 
   to.items.push(item)
 }
 
-// --- gun attachments --------------------------------------------------------------
+// --- item details ----------------------------------------------------------------
 
-// The gun whose dialog is open, floating beside it.
-const modding = ref<Item | null>(null)
-const moddingFrom = computed(() => (modding.value ? storageOf(modding.value, allStorages.value) : null))
+// The item whose detail dialog is open, floating beside it.
+const inspecting = ref<Item | null>(null)
+const inspectingFrom = computed(() => (inspecting.value ? storageOf(inspecting.value, allStorages.value) : null))
 
-// Close when the gun goes away, e.g. the container it was in is swapped for the next one.
+// Close when the item goes away, e.g. the container it was in is swapped for the next one.
 watchEffect(() => {
-  if (modding.value && !moddingFrom.value) modding.value = null
+  if (inspecting.value && !inspectingFrom.value) inspecting.value = null
 })
 
-function closeMods() {
+function closeDetails() {
   hideTooltip()
-  modding.value = null
+  inspecting.value = null
 }
 
-function onItemClick(item: Item, from: Storage) {
+function showDetails(item: Item) {
   if (!item.revealed) return
-  if (item.attachments.length) {
-    hideTooltip()
-    modding.value = item
-    return
-  }
-  // With a gun open, a part that fits a free slot goes onto the gun.
-  const slot = modding.value && freeAttachmentSlot(modding.value, item)
-  if (slot && !(from.kind === 'slot' && from.locked)) return moveItem(item, from, slot, 0, 0)
-  quickMove(item, from)
+  hideTooltip()
+  inspecting.value = item
 }
 
 // Detaching a part hands it to the player, or drops it in the container when they're full.
@@ -160,15 +153,15 @@ function detach(part: Item, from: SlotStorage) {
   flash(t('raid.noSpace'))
 }
 
-// Equip / pick up / put back the open gun. The dialog stays open and follows it.
-function gunAction(action: GunAction) {
-  const gun = modding.value
-  const from = moddingFrom.value
-  if (!gun || !from) return
-  for (const target of gunActionTargets(action, player, loot.value)) {
+// Equip / pick up / put back the open item. The dialog stays open and follows it.
+function itemAction(action: ItemAction) {
+  const item = inspecting.value
+  const from = inspectingFrom.value
+  if (!item || !from) return
+  for (const target of itemActionTargets(action, player, loot.value)) {
     if (target === from) continue
-    const spot = findSpot(target, gun.def)
-    if (spot) return moveItem(gun, from, target, spot.x, spot.y)
+    const spot = findSpot(target, item.def)
+    if (spot) return moveItem(item, from, target, spot.x, spot.y)
   }
   flash(t(action === 'equip' ? 'raid.cantEquip' : 'raid.noSpace'))
 }
@@ -205,7 +198,11 @@ function onDrop(target: Storage, cx: number, cy: number) {
 // Event handlers for one storage (grid or slot), spread onto its component.
 function on(storage: Storage) {
   return {
-    'item-click': (item: Item) => onItemClick(item, storage),
+    'item-click': showDetails,
+    'item-dblclick': (item: Item) => {
+      closeDetails()
+      quickMove(item, storage)
+    },
     'drag-start': (item: Item, gx: number, gy: number) => (drag = { item, from: storage, gx, gy }),
     'drop-at': (cx: number, cy: number) => onDrop(storage, cx, cy),
   }
@@ -295,8 +292,8 @@ const tipStyle = computed(() => ({
     </main>
 
     <footer class="hints">
-      <span><kbd>LMB</kbd> {{ t('raid.hintQuickMove') }}</span>
-      <span><kbd>LMB</kbd> {{ t('raid.hintMods') }}</span>
+      <span><kbd>LMB</kbd> {{ t('raid.hintDetails') }}</span>
+      <span><kbd>LMB×2</kbd> {{ t('raid.hintQuickMove') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintCarry') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintEquip') }}</span>
       <button class="extract" @click="finish"><kbd>Esc</kbd> {{ t('raid.extract') }}</button>
@@ -308,14 +305,14 @@ const tipStyle = computed(() => ({
       <div class="tip-value"><span class="coin" /> {{ formatValue(tooltip.item.value) }}</div>
     </div>
 
-    <WeaponDialog
-      v-if="modding && moddingFrom"
-      :key="modding.uid"
-      :gun="modding"
-      :from="moddingFrom"
-      @close="closeMods"
-      @action="gunAction"
-      @item-click="(slot, item) => detach(item, slot)"
+    <ItemDialog
+      v-if="inspecting && inspectingFrom"
+      :key="inspecting.uid"
+      :item="inspecting"
+      :from="inspectingFrom"
+      @close="closeDetails"
+      @action="itemAction"
+      @part-dblclick="(slot, part) => detach(part, slot)"
       @drag-start="(slot, item, gx, gy) => on(slot)['drag-start'](item, gx, gy)"
       @drop-at="(slot) => onDrop(slot, 0, 0)"
     />

@@ -1,4 +1,4 @@
-import type { Item, LootContainer, Player, RaidResult, SlotStorage, Storage } from './models.ts'
+import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotType, Storage } from './models.ts'
 
 // The item plus any parts attached to it.
 function withAttachments(item: Item): Item[] {
@@ -32,21 +32,21 @@ export function storageOf(item: Item, storages: Storage[]): Storage | null {
   return storages.find((s) => s.items.includes(item)) ?? null
 }
 
-// The first free attachment slot on the gun that takes this part.
-export function freeAttachmentSlot(gun: Item, part: Item): SlotStorage | null {
-  return gun.attachments.find((s) => !s.items.length && s.accepts === part.def.slot) ?? null
+const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'pistol', 'melee']
+const isGearSlot = (slot: SlotType | undefined) => GEAR_SLOTS.some((s) => s === slot)
+
+// What the item dialog offers, depending on the item and where it is.
+export type ItemAction = 'equip' | 'unequip' | 'pickUp' | 'putBack'
+
+export function itemActions(item: Item, from: Storage): ItemAction[] {
+  if (from.kind === 'slot' && from.locked) return []
+  const equip: ItemAction[] = isGearSlot(item.def.slot) ? ['equip'] : []
+  if (from.owner === 'loot') return [...equip, 'pickUp']
+  return from.kind === 'slot' ? ['unequip', 'putBack'] : [...equip, 'putBack']
 }
 
-// What the weapon dialog offers for a gun, depending on where it is.
-export type GunAction = 'equip' | 'unequip' | 'pickUp' | 'putBack'
-
-export function gunActions(from: Storage): GunAction[] {
-  if (from.owner === 'loot') return ['equip', 'pickUp']
-  return from.kind === 'slot' ? ['unequip', 'putBack'] : ['equip', 'putBack']
-}
-
-// Where each action tries to put the gun, first fit wins.
-export function gunActionTargets(action: GunAction, player: Player, loot: LootContainer): Storage[] {
+// Where each action tries to put the item, first fit wins.
+export function itemActionTargets(action: ItemAction, player: Player, loot: LootContainer): Storage[] {
   if (action === 'equip') return player.slots
   if (action === 'putBack') return [...loot.grids, ...loot.slots]
   return player.grids

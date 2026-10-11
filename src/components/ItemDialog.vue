@@ -2,22 +2,23 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import SlotBox from './SlotBox.vue'
 import { itemRepository } from '../di.ts'
-import { gunActions, itemValue, itemWeight } from '../domain/raid.ts'
+import { itemActions, itemValue, itemWeight } from '../domain/raid.ts'
 import { formatValue } from '../lib/format.ts'
 import { t, tn, type UiKey } from '../i18n/index.ts'
-import type { GunAction } from '../domain/raid.ts'
+import type { ItemAction } from '../domain/raid.ts'
 import type { Item, SlotStorage, SlotType, Storage } from '../domain/models.ts'
 
 interface Props {
-  gun: Item
-  // Where the gun is now; decides which actions are offered.
+  item: Item
+  // Where the item is now; decides which actions are offered.
   from: Storage
 }
 
 interface Emits {
   close: []
-  action: [action: GunAction]
-  'item-click': [slot: SlotStorage, item: Item]
+  action: [action: ItemAction]
+  // Double-clicking an attached part detaches it.
+  'part-dblclick': [slot: SlotStorage, part: Item]
   'drag-start': [slot: SlotStorage, item: Item, gx: number, gy: number]
   'drop-at': [slot: SlotStorage]
 }
@@ -32,14 +33,14 @@ interface Position {
   top: string
 }
 
-const ACTIONS: Record<GunAction, ActionButton> = {
-  equip: { label: 'gun.equip', icon: '⤓' },
-  unequip: { label: 'gun.unequip', icon: '⤒' },
-  pickUp: { label: 'gun.pickUp', icon: '↗' },
-  putBack: { label: 'gun.putBack', icon: '↩' },
+const ACTIONS: Record<ItemAction, ActionButton> = {
+  equip: { label: 'item.equip', icon: '⤓' },
+  unequip: { label: 'item.unequip', icon: '⤒' },
+  pickUp: { label: 'item.pickUp', icon: '↗' },
+  putBack: { label: 'item.putBack', icon: '↩' },
 }
 
-// Below this width the dialog is a bottom sheet instead of floating by the gun.
+// Below this width the dialog is a bottom sheet instead of floating by the item.
 const NARROW = 700
 const GAP = 8
 
@@ -48,8 +49,8 @@ const emit = defineEmits<Emits>()
 const dialog = useTemplateRef('dialog')
 const position = ref<Position | null>(null)
 
-const actions = computed(() => gunActions(props.from))
-const sizeCells = computed(() => props.gun.def.w * props.gun.def.h)
+const actions = computed(() => itemActions(props.item, props.from))
+const sizeCells = computed(() => props.item.def.w * props.item.def.h)
 
 // Empty slots show a faded picture of a part that goes there.
 const ghosts = new Map<SlotType, string>()
@@ -57,10 +58,10 @@ for (const def of itemRepository.getAll()) {
   if (def.slot && def.img && !ghosts.has(def.slot)) ghosts.set(def.slot, def.img)
 }
 
-// Float beside the gun's tile: to its right if there's room, else to its left.
+// Float beside the item's tile: to its right if there's room, else to its left.
 function place() {
   const el = dialog.value
-  const tile = document.querySelector(`.tile[data-uid="${props.gun.uid}"]`)
+  const tile = document.querySelector(`.tile[data-uid="${props.item.uid}"]`)
   if (!el || !tile || window.innerWidth < NARROW) {
     position.value = null
     return
@@ -75,9 +76,8 @@ function place() {
   position.value = { left: `${left}px`, top: `${top}px` }
 }
 
-// The gun's tile moves when the gun does, and when its panel scrolls.
+// The tile moves when the item does, and when its panel scrolls.
 watch(() => props.from, () => nextTick(place))
-watch(() => props.gun, () => nextTick(place))
 onMounted(() => {
   place()
   window.addEventListener('resize', place)
@@ -90,43 +90,47 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="dialog" class="dialog" :class="`r${gun.def.rarity}`" :style="position ?? {}" role="dialog" :aria-label="tn(gun.def.name)">
+  <div ref="dialog" class="dialog" :class="`r${item.def.rarity}`" :style="position ?? {}" role="dialog" :aria-label="tn(item.def.name)">
     <header class="head">
-      <b class="name">{{ tn(gun.def.name) }}</b>
-      <button class="close" :aria-label="t('gun.close')" @click="emit('close')">✕</button>
+      <span class="diamond" />
+      <b class="name">{{ tn(item.def.name) }}</b>
+      <button class="close" :aria-label="t('item.close')" @click="emit('close')">✕</button>
     </header>
 
     <div class="showcase">
-      <div class="value"><span class="coin" /> {{ formatValue(itemValue(gun)) }}</div>
-      <img v-if="gun.def.img" class="gun" :src="gun.def.img" alt="" draggable="false" />
+      <div class="value"><span class="coin" /> {{ formatValue(itemValue(item)) }}</div>
+      <img v-if="item.def.img" class="picture" :src="item.def.img" alt="" draggable="false" />
+      <span v-else class="picture emoji">{{ item.def.icon }}</span>
       <div class="specs">
-        <span>{{ itemWeight(gun).toFixed(2) }}KG</span>
-        <span class="size" :style="{ '--w': gun.def.w }">
+        <span>{{ itemWeight(item).toFixed(2) }}KG</span>
+        <span class="size" :style="{ '--w': item.def.w }">
           <i v-for="n in sizeCells" :key="n" />
         </span>
       </div>
     </div>
 
-    <div class="body">
-      <div class="actions">
+    <div v-if="actions.length || item.attachments.length" class="body">
+      <div v-if="actions.length" class="actions">
         <button v-for="a in actions" :key="a" @click="emit('action', a)">
           <span class="icon">{{ ACTIONS[a].icon }}</span> {{ t(ACTIONS[a].label) }}
         </button>
       </div>
 
-      <h3>{{ t('gun.attachments') }}</h3>
-      <div class="slots">
-        <SlotBox
-          v-for="slot in gun.attachments"
-          :key="slot.id"
-          :slot="slot"
-          caption
-          :ghost="ghosts.get(slot.accepts)"
-          @item-click="(item) => emit('item-click', slot, item)"
-          @drag-start="(item, gx, gy) => emit('drag-start', slot, item, gx, gy)"
-          @drop-at="emit('drop-at', slot)"
-        />
-      </div>
+      <template v-if="item.attachments.length">
+        <h3>{{ t('item.attachments') }}</h3>
+        <div class="slots">
+          <SlotBox
+            v-for="slot in item.attachments"
+            :key="slot.id"
+            :slot="slot"
+            caption
+            :ghost="ghosts.get(slot.accepts)"
+            @item-dblclick="(part) => emit('part-dblclick', slot, part)"
+            @drag-start="(part, gx, gy) => emit('drag-start', slot, part, gx, gy)"
+            @drop-at="emit('drop-at', slot)"
+          />
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -149,6 +153,14 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 8px 10px 8px 14px;
   background: #232b33;
+}
+.diamond {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: 2px;
+  background: var(--rc);
+  transform: rotate(45deg);
 }
 .name {
   flex: 1;
@@ -196,13 +208,18 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #fff, #8a939b);
 }
-.gun {
+.picture {
   position: absolute;
   inset: 34px 30px 34px;
   width: calc(100% - 60px);
   height: calc(100% - 68px);
   object-fit: contain;
   filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.6));
+}
+.emoji {
+  display: grid;
+  place-items: center;
+  font-size: 64px;
 }
 .specs {
   position: absolute;

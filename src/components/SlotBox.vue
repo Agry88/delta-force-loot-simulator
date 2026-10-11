@@ -16,6 +16,7 @@ interface Props {
 
 interface Emits {
   'item-click': [item: Item]
+  'item-dblclick': [item: Item]
   'drag-start': [item: Item, gx: number, gy: number]
   'drop-at': [cx: number, cy: number]
 }
@@ -39,7 +40,8 @@ const item = computed(() => props.slot.items[0])
       :item="item"
       mode="slot"
       :locked="slot.locked"
-      @click="!slot.locked && emit('item-click', item)"
+      @click="emit('item-click', item)"
+      @dblclick="!slot.locked && emit('item-dblclick', item)"
       @grab="emit('drag-start', item, 0, 0)"
     />
     <img v-else-if="ghost" class="ghost" :src="ghost" alt="" draggable="false" loading="lazy" />
