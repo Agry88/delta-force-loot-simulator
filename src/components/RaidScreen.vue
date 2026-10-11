@@ -5,8 +5,8 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
-import { findSlot, findSpot, fits, gridsOf, sectionsOf } from '../domain/grid.ts'
-import { canHold, carryWeight, freeAttachmentSlot, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import { findSlot, findSpot, fits, gridsOf, growToFit, sectionsOf } from '../domain/grid.ts'
+import { canHold, carryWeight, freeAttachmentSlot, itemActions, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
@@ -30,16 +30,21 @@ const emit = defineEmits<Emits>()
 
 const player = reactive(lootGenerator.createPlayer())
 const loot = ref(lootGenerator.createLootContainer(props.mode))
+const ground = ref(lootGenerator.createGround())
+// The loot panel shows either the container or what's been dropped on the ground.
+const viewingGround = ref(false)
+const shownLoot = computed(() => (viewingGround.value ? ground.value : loot.value))
+const groundGrid = computed(() => ground.value.grids[0])
 const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
 const playerSections = computed(() => sectionsOf(player))
-const lootSections = computed(() => sectionsOf(loot.value))
+const lootSections = computed(() => sectionsOf(shownLoot.value))
 const playerGrids = computed(() => gridsOf(player))
 const lootGrids = computed(() => gridsOf(loot.value))
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrids.value])
-const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value])
+const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value, groundGrid.value])
 const playerSlot = (id: string) => findSlot(player.slots, id)
 const lootSlot = (id: string) => findSlot(loot.value.slots, id)
 
@@ -68,6 +73,11 @@ function finish() {
 }
 
 function onKey(e: KeyboardEvent) {
+  // Alt+D drops the hovered item. Matched by code, since Alt changes the key on macOS.
+  if (e.altKey && e.code === 'KeyD') {
+    e.preventDefault()
+    return dropHovered()
+  }
   if (e.key !== 'Escape') return
   if (inspecting.value) closeDetails()
   else finish()
@@ -112,6 +122,8 @@ async function runSearch() {
 function nextContainer() {
   hideTooltip()
   loot.value = lootGenerator.createLootContainer(props.mode)
+  ground.value = lootGenerator.createGround()
+  viewingGround.value = false
   containersOpened.value++
   runSearch()
 }
@@ -148,6 +160,18 @@ function moveToFirst(item: Item, from: Storage, targets: Storage[]): boolean {
   return false
 }
 
+// The ground always has room, and takes bags with things still in them.
+function dropItem(item: Item, from: Storage) {
+  const spot = growToFit(groundGrid.value, item.def)
+  moveItem(item, from, groundGrid.value, spot.x, spot.y)
+}
+
+function dropHovered() {
+  const item = tooltip.item
+  const from = item && storageOf(item, playerStorages.value)
+  if (item && from && itemActions(item, from).includes('drop')) dropItem(item, from)
+}
+
 // --- item details ----------------------------------------------------------------
 
 // The item whose detail dialog is open, floating beside it.
@@ -175,18 +199,21 @@ function detach(part: Item, from: SlotStorage) {
   if (!moveToFirst(part, from, [...playerGrids.value, ...lootGrids.value])) flash(t('raid.noSpace'))
 }
 
-// Equip / pick up / put back the open item. The dialog stays open and follows it.
+// Equip / pick up / put back / drop the open item, then close its dialog.
 function itemAction(action: ItemAction) {
   const item = inspecting.value
   const from = inspectingFrom.value
+  closeDetails()
   if (!item || !from) return
-  if (moveToFirst(item, from, itemActionTargets(action, player, loot.value))) return
+  if (action === 'drop' || (action === 'putBack' && viewingGround.value)) return dropItem(item, from)
+  if (moveToFirst(item, from, itemActionTargets(action, player, shownLoot.value))) return
   flash(t(action === 'equip' ? 'raid.cantEquip' : bagFullMessage(item)))
 }
 
 function quickMove(item: Item, from: Storage) {
   if (!item.revealed || (from.kind === 'slot' && from.locked)) return
-  if (!moveToFirst(item, from, quickMoveTargets(item, from, player, loot.value))) flash(t(bagFullMessage(item)))
+  if (from.owner === 'player' && viewingGround.value) return dropItem(item, from)
+  if (!moveToFirst(item, from, quickMoveTargets(item, from, player, shownLoot.value))) flash(t(bagFullMessage(item)))
 }
 
 // Why an item found no room: a bag with things in it can only be worn.
@@ -315,11 +342,14 @@ const tipStyle = computed(() => ({
       <section class="panel loot">
         <div class="loot-head">
           {{ t('raid.loot') }}
-          <span class="loot-name">{{ tn(loot.name) }}</span>
-          <em>{{ t(searching ? 'raid.searching' : 'raid.searched') }}</em>
+          <span class="loot-name">{{ tn(shownLoot.name) }}</span>
+          <em v-if="!viewingGround">{{ t(searching ? 'raid.searching' : 'raid.searched') }}</em>
+          <button class="ground-toggle" @click="viewingGround = !viewingGround">
+            {{ viewingGround ? t('raid.backToLoot') : t('raid.ground', { n: groundGrid.items.length }) }}
+          </button>
         </div>
-        <div :key="containersOpened" class="scroll">
-          <div v-if="loot.slots.length" class="loot-gear">
+        <div :key="`${containersOpened}-${viewingGround}`" class="scroll">
+          <div v-if="shownLoot.slots.length" class="loot-gear">
             <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="lootSlot(id)" v-on="on(lootSlot(id))" />
             <SlotBox
               v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
@@ -333,7 +363,7 @@ const tipStyle = computed(() => ({
               <SlotBox class="bag" :slot="s.slot" v-on="on(s.slot)" />
             </template>
           </StorageSection>
-          <button class="next" @click="nextContainer">{{ t('raid.next') }}</button>
+          <button v-if="!viewingGround" class="next" @click="nextContainer">{{ t('raid.next') }}</button>
         </div>
       </section>
     </main>
@@ -343,6 +373,7 @@ const tipStyle = computed(() => ({
       <span><kbd>LMB×2</kbd> {{ t('raid.hintQuickMove') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintCarry') }}</span>
       <span class="desktop-only"><kbd>Drag</kbd> {{ t('raid.hintEquip') }}</span>
+      <span class="desktop-only"><kbd>Alt+D</kbd> {{ t('raid.hintDrop') }}</span>
       <button class="extract" @click="finish"><kbd>Esc</kbd> {{ t('raid.extract') }}</button>
     </footer>
 
@@ -571,18 +602,34 @@ kbd {
   border-left: 3px solid #e5484d;
 }
 .loot-name {
+  margin-right: auto;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
   color: #f2c9cb;
 }
 .loot-head em {
-  margin-left: auto;
   font-size: 12px;
   font-style: normal;
   font-weight: 500;
   letter-spacing: 0;
   color: #d9a3a6;
+}
+.ground-toggle {
+  align-self: center;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #f2c9cb;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid #a8454b;
+  cursor: pointer;
+}
+.ground-toggle:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 0.4);
 }
 .loot-gear {
   display: flex;

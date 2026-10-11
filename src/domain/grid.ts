@@ -82,6 +82,16 @@ export function randomSpot(target: Storage, def: ItemDef): Spot | null {
   return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null
 }
 
+// A spot for the item, adding rows to the grid until there is one. Only for grids with no cell cap (the ground).
+export function growToFit(grid: GridStorage, def: ItemDef): Spot {
+  let spot = findSpot(grid, def)
+  while (!spot) {
+    grid.h += def.h
+    spot = findSpot(grid, def)
+  }
+  return spot
+}
+
 export function usedCells(grid: GridStorage): number {
   return grid.items.reduce((sum, it) => sum + it.def.w * it.def.h, 0)
 }

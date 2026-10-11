@@ -38,6 +38,7 @@ const ACTIONS: Record<ItemAction, ActionButton> = {
   unequip: { label: 'item.unequip', icon: '⤒' },
   pickUp: { label: 'item.pickUp', icon: '↗' },
   putBack: { label: 'item.putBack', icon: '↩' },
+  drop: { label: 'item.drop', icon: '⬇' },
 }
 
 // Below this width the dialog is a bottom sheet instead of floating by the item.
@@ -312,6 +313,10 @@ onBeforeUnmount(() => {
   background: #161c21;
   border: 1px solid #4a545e;
   cursor: pointer;
+}
+/* An odd button out takes the whole row. */
+.actions button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .actions button:hover {
   border-color: var(--accent);

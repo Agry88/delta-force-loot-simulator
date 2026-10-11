@@ -190,6 +190,11 @@ export class LootGenerator {
     return Math.random() < 0.4 ? this.createBody() : this.createCrate()
   }
 
+  // What the player has dropped where they stand. Its grid grows as things are dropped.
+  createGround(): LootContainer {
+    return { name: 'Ground', slots: [], grids: [makeGrid('loot', 'ground', 'Ground', BAG_WIDTH, 2, '⬇️')] }
+  }
+
   private pickItem({ prefer = [], luck = 1, slot = null }: PickOptions = {}): ItemDef {
     return pickWeighted(
       this.items

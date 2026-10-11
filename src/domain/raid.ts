@@ -58,13 +58,13 @@ const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'rig', 'backpack', 
 const isGearSlot = (slot: SlotType | undefined) => GEAR_SLOTS.some((s) => s === slot)
 
 // What the item dialog offers, depending on the item and where it is.
-export type ItemAction = 'equip' | 'unequip' | 'pickUp' | 'putBack'
+export type ItemAction = 'equip' | 'unequip' | 'pickUp' | 'putBack' | 'drop'
 
 export function itemActions(item: Item, from: Storage): ItemAction[] {
   if (from.kind === 'slot' && from.locked) return []
   const equip: ItemAction[] = isGearSlot(item.def.slot) ? ['equip'] : []
   if (from.owner === 'loot') return [...equip, 'pickUp']
-  return from.kind === 'slot' ? ['unequip', 'putBack'] : [...equip, 'putBack']
+  return from.kind === 'slot' ? ['unequip', 'putBack', 'drop'] : [...equip, 'putBack', 'drop']
 }
 
 // Where each action tries to put the item, first fit wins.
