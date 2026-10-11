@@ -24,10 +24,18 @@ export default {
     'raid.hintQuickMove': '快速移動',
     'raid.hintCarry': '攜帶 / 放回',
     'raid.hintEquip': '裝備 / 交換',
+    'raid.hintMods': '槍械：配件',
     'raid.extract': '撤離',
     'raid.noSpace': '空間不足',
     'raid.cantEquip': '無法裝備在此欄位',
     'raid.doesntFit': '放不下',
+
+    'gun.equip': '裝備',
+    'gun.unequip': '卸下',
+    'gun.pickUp': '拾取',
+    'gun.putBack': '放回',
+    'gun.attachments': '槍械配件',
+    'gun.close': '關閉',
 
     'storage.size': '{w}×{h} 格空間',
 
@@ -92,6 +100,24 @@ export default {
     'Body Armor': '防彈衣',
     Pistol: '手槍',
     Melee: '近戰武器',
+
+    // Gun attachment slots
+    'Rear Grip': '後握把',
+    Barrel: '槍管',
+    Muzzle: '槍口',
+    Stock: '槍托',
+    Foregrip: '前握把',
+    'Rail Bipod': '導軌腳架',
+    'Top Rail': '上導軌',
+    'Left Rail': '左導軌',
+    'Right Rail': '右導軌',
+    'Top Panel': '上貼片',
+    'Left Panel': '左貼片',
+    'Right Panel': '右貼片',
+    Magazine: '彈匣',
+    'Mag Well': '彈匣座',
+    Optic: '瞄準鏡',
+    'Side Sight': '側瞄具',
 
     // Storage and containers
     'Chest Rig': '胸掛',

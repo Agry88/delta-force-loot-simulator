@@ -22,10 +22,18 @@ export default {
     'raid.hintQuickMove': 'Quick Move',
     'raid.hintCarry': 'Carry / Put Back',
     'raid.hintEquip': 'Equip / Swap',
+    'raid.hintMods': 'Gun: Attachments',
     'raid.extract': 'Extract',
     'raid.noSpace': 'Not enough space',
     'raid.cantEquip': "Can't equip that here",
     'raid.doesntFit': "Doesn't fit there",
+
+    'gun.equip': 'Equip',
+    'gun.unequip': 'Unequip',
+    'gun.pickUp': 'Pick Up',
+    'gun.putBack': 'Put Back',
+    'gun.attachments': 'Weapon Attachments',
+    'gun.close': 'Close',
 
     'storage.size': '{w}×{h} storage',
 

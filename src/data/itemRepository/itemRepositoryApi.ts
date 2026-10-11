@@ -33,7 +33,25 @@ const CATEGORY_BY_SUB: Record<string, Category> = {
 }
 const CATEGORY_BY_TYPE: Record<string, Category> = { WEAPON: 'weapon', WEAPON_PART: 'part', GEAR: 'gear', AMMO: 'ammo', CONSUMABLE: 'med', KEYCARD: 'valuable' }
 
-const SLOT_BY_SUB: Record<string, SlotType> = { WEAPON_PISTOL: 'pistol', GEAR_HELMET: 'helmet', GEAR_VEST: 'armor' }
+const SLOT_BY_SUB: Record<string, SlotType> = {
+  WEAPON_PISTOL: 'pistol',
+  GEAR_HELMET: 'helmet',
+  GEAR_VEST: 'armor',
+  // Weapon parts, by the attachment slot they mount in. Other part types can't be attached.
+  PART_REAR_GRIP: 'rearGrip',
+  PART_BARREL: 'barrel',
+  PART_MUZZLE: 'muzzle',
+  PART_STOCK: 'stock',
+  PART_FOREGRIP: 'foregrip',
+  PART_BIPOD: 'bipod',
+  PART_UPPER_RAIL: 'rail',
+  PART_SIGHT_RISER: 'rail',
+  PART_TACTICAL_DEVICE: 'tactical',
+  PART_HANDGUARD_PANEL: 'panel',
+  PART_MAGAZINE: 'magazine',
+  PART_MAG_ASSIST: 'magWell',
+  PART_SIGHT: 'sight',
+}
 
 function toDef(it: CatalogEntry): ItemDef {
   const rarity: Rarity =

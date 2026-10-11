@@ -2,4 +2,5 @@
 import { ItemRepositoryApi } from './data/itemRepository/itemRepositoryApi.ts'
 import { LootGenerator } from './domain/loot.ts'
 
-export const lootGenerator = new LootGenerator(new ItemRepositoryApi())
+export const itemRepository = new ItemRepositoryApi()
+export const lootGenerator = new LootGenerator(itemRepository)

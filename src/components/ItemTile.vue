@@ -50,6 +50,7 @@ function onHover(e: MouseEvent) {
   <div
     ref="tile"
     class="tile"
+    :data-uid="item.uid"
     :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked }]"
     :draggable="item.revealed && !locked"
     @dragstart="onDragStart"
