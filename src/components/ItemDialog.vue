@@ -121,16 +121,35 @@ function startMove(e: PointerEvent) {
   window.addEventListener('pointerup', onUp)
 }
 
+// A click anywhere outside closes the dialog. Only a press that started outside counts,
+// so moving the dialog and letting go past its edge doesn't. Dragging a part onto the gun
+// is a native drag, which never clicks, so it keeps the dialog open.
+let pressedOutside = false
+function isOutside(e: Event) {
+  return !(dialog.value && e.target instanceof Node && dialog.value.contains(e.target))
+}
+function onPointerDown(e: PointerEvent) {
+  pressedOutside = isOutside(e)
+}
+// Captured, so clicking another item closes this dialog before that item opens its own.
+function onClick(e: MouseEvent) {
+  if (pressedOutside && isOutside(e)) emit('close')
+}
+
 // The tile moves when the item does, and when its panel scrolls.
 watch(() => props.from, () => nextTick(place))
 onMounted(() => {
   place()
   window.addEventListener('resize', place)
   window.addEventListener('scroll', place, true)
+  window.addEventListener('pointerdown', onPointerDown, true)
+  window.addEventListener('click', onClick, true)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', place)
   window.removeEventListener('scroll', place, true)
+  window.removeEventListener('pointerdown', onPointerDown, true)
+  window.removeEventListener('click', onClick, true)
 })
 </script>
 
