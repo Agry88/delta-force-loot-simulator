@@ -96,6 +96,30 @@ export function randomSpot(target: Storage, def: ItemDef): Spot | null {
   return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null
 }
 
+export interface Placement {
+  item: Item
+  x: number
+  y: number
+}
+
+// Where everything would sit if the grid were packed afresh with the item added: biggest first, each in the
+// first free spot, ties kept in their current reading order. Null when even that leaves no room.
+export function repackWith(grid: GridStorage, item: Item): Placement[] | null {
+  const area = (it: Item) => it.def.w * it.def.h
+  const order = [...grid.items, item].sort(
+    (a, b) => area(b) - area(a) || b.def.h - a.def.h || a.y - b.y || a.x - b.x,
+  )
+  const scratch: GridStorage = { ...grid, items: [] }
+  const placements: Placement[] = []
+  for (const it of order) {
+    const spot = findSpot(scratch, it.def)
+    if (!spot) return null
+    scratch.items.push({ ...it, ...spot })
+    placements.push({ item: it, ...spot })
+  }
+  return placements
+}
+
 // A spot for the item, adding rows to the grid until there is one. Only for grids with no cell cap (the ground).
 export function growToFit(grid: GridStorage, def: ItemDef): Spot {
   let spot = findSpot(grid, def)
