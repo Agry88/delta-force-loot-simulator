@@ -5,7 +5,7 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
-import { findSlot, findSpot, fits, gridsOf, growToFit, sectionsOf } from '../domain/grid.ts'
+import { findSpot, fits, gridsOf, growToFit, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
 import { canHold, carryWeight, freeAttachmentSlot, itemActions, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
@@ -39,14 +39,12 @@ const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
-const playerSections = computed(() => sectionsOf(player))
-const lootSections = computed(() => sectionsOf(shownLoot.value))
+const playerSections = computed(() => storageSections(player))
+const lootSections = computed(() => storageSections(shownLoot.value))
 const playerGrids = computed(() => gridsOf(player))
 const lootGrids = computed(() => gridsOf(loot.value))
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrids.value])
 const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value, groundGrid.value])
-const playerSlot = (id: string) => findSlot(player.slots, id)
-const lootSlot = (id: string) => findSlot(loot.value.slots, id)
 
 const earnings = computed(() => lootValue(playerStorages.value))
 const weight = computed(() => carryWeight(playerStorages.value))
@@ -295,13 +293,8 @@ const tipStyle = computed(() => ({
       <section class="character">
         <div class="figure"><OperatorFigure /></div>
         <div class="equipment">
-          <SlotBox
-            v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
-            :key="id"
-            :slot="playerSlot(id)"
-            v-on="on(playerSlot(id))"
-          />
-          <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="playerSlot(id)" v-on="on(playerSlot(id))" />
+          <SlotBox v-for="s in wornGearSlots(player)" :key="s.id" :slot="s" v-on="on(s)" />
+          <SlotBox v-for="s in weaponSlots(player)" :key="s.id" :slot="s" v-on="on(s)" />
         </div>
         <div class="vitals">
           <div class="weight">
@@ -350,13 +343,8 @@ const tipStyle = computed(() => ({
         </div>
         <div :key="`${containersOpened}-${viewingGround}`" class="scroll">
           <div v-if="shownLoot.slots.length" class="loot-gear">
-            <SlotBox v-for="id in ['weapon1', 'weapon2']" :key="id" :slot="lootSlot(id)" v-on="on(lootSlot(id))" />
-            <SlotBox
-              v-for="id in ['helmet', 'armor', 'pistol', 'melee']"
-              :key="id"
-              :slot="lootSlot(id)"
-              v-on="on(lootSlot(id))"
-            />
+            <SlotBox v-for="s in weaponSlots(shownLoot)" :key="s.id" :slot="s" v-on="on(s)" />
+            <SlotBox v-for="s in wornGearSlots(shownLoot)" :key="s.id" :slot="s" v-on="on(s)" />
           </div>
           <StorageSection v-for="s in lootSections" :key="s.id" :name="s.name" :grid="s.grid" v-on="s.grid ? on(s.grid) : {}">
             <template v-if="s.slot" #icon>

@@ -29,18 +29,32 @@ export interface Section {
 }
 
 // The storage panels of a player or body in order, with the rig and backpack around the pockets.
-export function sectionsOf(p: Player): Section[] {
-  const bag = (id: string): Section[] => {
-    const slot = p.slots.find((s) => s.id === id)
-    return slot ? [{ id, name: slot.name, slot, grid: slot.items[0]?.storage ?? null }] : []
+export function storageSections(p: Player): Section[] {
+  const wornBagSection = (slotId: string): Section[] => {
+    const slot = p.slots.find((s) => s.id === slotId)
+    return slot ? [{ id: slotId, name: slot.name, slot, grid: slot.items[0]?.storage ?? null }] : []
   }
-  const plain = (g: GridStorage): Section => ({ id: g.id, name: g.name, slot: null, grid: g })
-  return p.grids.flatMap((g) => (g.id === 'pockets' ? [...bag('rig'), plain(g), ...bag('backpack')] : [plain(g)]))
+  const gridSection = (grid: GridStorage): Section => ({ id: grid.id, name: grid.name, slot: null, grid })
+  return p.grids.flatMap((grid) =>
+    grid.id === 'pockets'
+      ? [...wornBagSection('rig'), gridSection(grid), ...wornBagSection('backpack')]
+      : [gridSection(grid)],
+  )
 }
 
 // Every grid that can hold items on a player or body, in panel order.
 export function gridsOf(p: Player): GridStorage[] {
-  return sectionsOf(p).flatMap((s) => (s.grid ? [s.grid] : []))
+  return storageSections(p).flatMap((s) => (s.grid ? [s.grid] : []))
+}
+
+// The weapon slots, shown side by side on the character and on a body.
+export function weaponSlots(p: Player): SlotStorage[] {
+  return p.slots.filter((s) => s.accepts === 'weapon')
+}
+
+// The worn gear shown with the weapons; the rig and backpack sit with their grids instead.
+export function wornGearSlots(p: Player): SlotStorage[] {
+  return p.slots.filter((s) => s.accepts !== 'weapon' && s.accepts !== 'rig' && s.accepts !== 'backpack')
 }
 
 export function fits(target: Storage, def: ItemDef, x: number, y: number, ignore: Item | null = null): boolean {
