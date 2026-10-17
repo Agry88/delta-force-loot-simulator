@@ -81,6 +81,20 @@ export function quickMoveTargets(item: Item, from: Storage, player: Player, loot
     : [...gridsOf(loot), ...loot.slots]
 }
 
+// The worn item a new one would replace: none while a slot it fits is free, else the lowest-rarity one.
+export function slotToSwap(item: Item, player: Player): SlotStorage | null {
+  const slots = player.slots.filter((s) => s.accepts === item.def.slot && !s.locked)
+  if (!slots.length || slots.some((s) => !s.items.length)) return null
+  return slots.reduce((a, b) => (wornRarity(b) < wornRarity(a) ? b : a))
+}
+
+// Whether the item is rarer than what's worn in the slot.
+export function isUpgrade(item: Item, slot: SlotStorage): boolean {
+  return wornRarity(slot) < item.def.rarity
+}
+
+const wornRarity = (slot: SlotStorage) => slot.items[0]?.def.rarity ?? 0
+
 export function raidResult(storages: Storage[], containersOpened: number): RaidResult {
   return {
     items: storages.flatMap((s) => s.items.flatMap(withAttachments).filter((it) => !it.owned).map((it) => ({ ...it.def, value: it.value, where: s.name }))),

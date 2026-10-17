@@ -6,7 +6,7 @@ import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSpot, fits, gridsOf, growToFit, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
-import { canHold, carryWeight, freeAttachmentSlot, itemActions, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, storageOf } from '../domain/raid.ts'
+import { canHold, carryWeight, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
@@ -204,6 +204,9 @@ function itemAction(action: ItemAction) {
   closeDetails()
   if (!item || !from) return
   if (action === 'drop' || (action === 'putBack' && viewingGround.value)) return dropItem(item, from)
+  // Equipping into a full slot trades places with what's worn there, better or not.
+  const worn = action === 'equip' ? slotToSwap(item, player) : null
+  if (worn) return swapGear(item, from, worn)
   if (moveToFirst(item, from, itemActionTargets(action, player, shownLoot.value))) return
   flash(t(action === 'equip' ? 'raid.cantEquip' : bagFullMessage(item)))
 }
@@ -211,7 +214,21 @@ function itemAction(action: ItemAction) {
 function quickMove(item: Item, from: Storage) {
   if (!item.revealed || (from.kind === 'slot' && from.locked)) return
   if (from.owner === 'player' && viewingGround.value) return dropItem(item, from)
+  // Double-clicking only swaps out worn gear for something rarer.
+  const worn = from.owner === 'loot' && item.def.slot ? slotToSwap(item, player) : null
+  if (worn && isUpgrade(item, worn)) return swapGear(item, from, worn)
   if (!moveToFirst(item, from, quickMoveTargets(item, from, player, shownLoot.value))) flash(t(bagFullMessage(item)))
+}
+
+// Wears the item, and the one it replaces takes its place: back in the loot, or in your bag when equipped from there.
+function swapGear(item: Item, from: Storage, slot: SlotStorage) {
+  const worn = slot.items[0]
+  if (!worn) return
+  const { x, y } = item
+  moveItem(item, from, slot, 0, 0)
+  if (from === groundGrid.value) return dropItem(worn, slot)
+  if (canHold(from, worn) && fits(from, worn.def, x, y)) return moveItem(worn, slot, from, x, y)
+  if (!moveToFirst(worn, slot, [from, ...itemActionTargets(from.owner === 'loot' ? 'putBack' : 'pickUp', player, shownLoot.value)])) dropItem(worn, slot)
 }
 
 // Why an item found no room: a bag with things in it can only be worn.
