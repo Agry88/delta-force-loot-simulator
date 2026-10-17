@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import GridContainer from './GridContainer.vue'
-import { usedCells } from '../domain/grid.ts'
+import { gridCells, usedCells } from '../domain/grid.ts'
 import { t, tn } from '../i18n/index.ts'
 import type { GridStorage } from '../domain/models.ts'
 
 defineOptions({ inheritAttrs: false })
 interface Props {
-  grid: GridStorage
+  name: string
+  // Null for a rig or backpack slot with nothing in it.
+  grid: GridStorage | null
   note?: string
 }
 
@@ -16,13 +18,17 @@ withDefaults(defineProps<Props>(), { note: '' })
 <template>
   <div class="storage">
     <div class="head">
-      <span>{{ tn(grid.name) }}: {{ usedCells(grid) }}<small>/{{ grid.w * grid.h }}</small></span>
-      <span class="q" :title="note || t('storage.size', { w: grid.w, h: grid.h })">?</span>
+      <span v-if="grid">{{ tn(name) }}: {{ usedCells(grid) }}<small>/{{ gridCells(grid) }}</small></span>
+      <span v-else>{{ tn(name) }}</span>
+      <span v-if="grid" class="q" :title="note || t('storage.size', { w: grid.w, h: grid.h })">?</span>
       <em v-if="note">{{ note }}</em>
     </div>
     <div class="body">
-      <div v-if="grid.icon" class="icon-tile" :style="{ '--rows': Math.min(grid.h, 2) }">{{ grid.icon }}</div>
-      <GridContainer :grid="grid" v-bind="$attrs" />
+      <!-- A rig or backpack puts the bag itself here, as an item slot. -->
+      <slot name="icon">
+        <div v-if="grid?.icon" class="icon-tile" :style="{ '--rows': Math.min(grid.h, 2) }">{{ grid.icon }}</div>
+      </slot>
+      <GridContainer v-if="grid" :grid="grid" v-bind="$attrs" />
     </div>
   </div>
 </template>
@@ -85,6 +91,10 @@ withDefaults(defineProps<Props>(), { note: '' })
 @media (max-width: 700px) {
   .icon-tile {
     display: none;
+  }
+  /* A bag's slot no longer fits beside its grid, so it goes above. */
+  .body {
+    flex-wrap: wrap;
   }
 }
 </style>

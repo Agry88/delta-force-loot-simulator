@@ -1,5 +1,5 @@
 import type { ItemRepository } from '../data/itemRepository/itemRepository.ts'
-import { findSlot, randomSpot } from './grid.ts'
+import { findSlot, gridCells, randomSpot } from './grid.ts'
 import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, PartSlot, Player, Rarity, SlotStorage, SlotType } from './models.ts'
 import { RARITY_WEIGHT } from './rarity.ts'
 
@@ -14,6 +14,8 @@ const SLOTS: Pick<SlotStorage, 'id' | 'name' | 'accepts' | 'label' | 'wide'>[] =
   { id: 'weapon2', name: 'Secondary Weapon', accepts: 'weapon', label: '2', wide: true },
   { id: 'helmet', name: 'Helmet', accepts: 'helmet' },
   { id: 'armor', name: 'Body Armor', accepts: 'armor' },
+  { id: 'rig', name: 'Chest Rig', accepts: 'rig' },
+  { id: 'backpack', name: 'Backpack', accepts: 'backpack' },
   { id: 'pistol', name: 'Pistol', accepts: 'pistol' },
   { id: 'melee', name: 'Melee', accepts: 'melee' },
 ]
@@ -52,7 +54,21 @@ const GUN_SPECIFIC: PartSlot[] = ['barrel', 'stock', 'magazine']
 const ATTACHMENT_CHANCE = 0.35
 
 // Chance an enemy body has something in each slot.
-const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, pistol: 0.45, melee: 0.5 }
+const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, rig: 0.85, backpack: 0.7, pistol: 0.45, melee: 0.5 }
+
+// Rig and backpack grids are this many cells wide; the panel fits 7 beside the bag's icon.
+const BAG_WIDTH = 7
+
+interface BagGrid {
+  id: string
+  name: string
+  icon: string
+}
+
+const BAG_GRIDS: Partial<Record<SlotType, BagGrid>> = {
+  rig: { id: 'rig', name: 'Chest Rig', icon: '🦺' },
+  backpack: { id: 'backpack', name: 'Backpack', icon: '🎒' },
+}
 
 interface PickOptions {
   prefer?: Category[]
@@ -104,6 +120,14 @@ function makeAttachmentSlots(def: ItemDef): SlotStorage[] {
   return slots.map((s) => ({ ...s, kind: 'slot', owner: 'player', items: [] }))
 }
 
+// The grid inside a chest rig or backpack, as wide as the panel allows.
+function makeBagStorage(def: ItemDef, owner: Owner): GridStorage | null {
+  const bag = def.slot && BAG_GRIDS[def.slot]
+  if (!bag || !def.capacity) return null
+  const w = Math.min(def.capacity, BAG_WIDTH)
+  return { ...makeGrid(owner, bag.id, bag.name, w, Math.ceil(def.capacity / w), bag.icon), cells: def.capacity }
+}
+
 function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false, cond }: MakeItemOptions = {}): Item {
   const max = def.dur ?? def.mag
   return {
@@ -118,6 +142,7 @@ function makeItem(def: ItemDef, { x = 0, y = 0, revealed = false, owned = false,
     searching: false,
     owned,
     attachments: makeAttachmentSlots(def),
+    storage: makeBagStorage(def, owned ? 'player' : 'loot'),
   }
 }
 
@@ -148,17 +173,14 @@ export class LootGenerator {
     equip('weapon2', 'M1014 Shotgun', 6)
     equip('helmet', 'H07 Tactical Helmet', 29)
     equip('armor', 'Light Vest', 0)
+    equip('rig', 'DSA Tactical Chest Rig')
+    equip('backpack', 'DASH Tactical Backpack')
     equip('melee', 'Combat Knife')
     slot('melee').locked = true
 
     return {
       slots,
-      grids: [
-        makeGrid('player', 'rig', 'Chest Rig', 7, 2, '🦺'),
-        makeGrid('player', 'pockets', 'Pockets', 5, 1),
-        makeGrid('player', 'backpack', 'Backpack', 6, 4, '🎒'),
-        makeGrid('player', 'safebox', 'Safebox', 2, 2, '🔐'),
-      ],
+      grids: [makeGrid('player', 'pockets', 'Pockets', 5, 1), makeGrid('player', 'safebox', 'Safebox', 2, 2, '🔐')],
     }
   }
 
@@ -166,6 +188,11 @@ export class LootGenerator {
     if (mode === 'crate') return this.createCrate()
     if (mode === 'body') return this.createBody()
     return Math.random() < 0.4 ? this.createBody() : this.createCrate()
+  }
+
+  // What the player has dropped where they stand. Its grid grows as things are dropped.
+  createGround(): LootContainer {
+    return { name: 'Ground', slots: [], grids: [makeGrid('loot', 'ground', 'Ground', BAG_WIDTH, 2, '⬇️')] }
   }
 
   private pickItem({ prefer = [], luck = 1, slot = null }: PickOptions = {}): ItemDef {
@@ -212,19 +239,15 @@ export class LootGenerator {
   private createBody(): LootContainer {
     const slots = makeSlots('loot')
     for (const slot of slots) {
-      if (Math.random() < BODY_SLOT_CHANCE[slot.id]) {
-        slot.items.push(this.attachParts(makeItem(this.pickItem({ slot: slot.accepts }), { revealed: true })))
-      }
+      if (Math.random() >= BODY_SLOT_CHANCE[slot.id]) continue
+      const item = this.attachParts(makeItem(this.pickItem({ slot: slot.accepts }), { revealed: true }))
+      // Bigger bags carry more.
+      if (item.storage) this.fillGrid(item.storage, randInt(2, Math.max(2, Math.round(gridCells(item.storage) / 4))), {})
+      slot.items.push(item)
     }
-    const grids = [makeGrid('loot', 'rig', 'Chest Rig', 7, 2, '🦺'), makeGrid('loot', 'pockets', 'Pockets', 5, 1)]
-    this.fillGrid(grids[0], randInt(2, 5), {})
-    this.fillGrid(grids[1], randInt(0, 3), {})
-    if (Math.random() < 0.7) {
-      const backpack = makeGrid('loot', 'backpack', 'Backpack', 6, 4, '🎒')
-      this.fillGrid(backpack, randInt(2, 6), {})
-      grids.push(backpack)
-    }
-    return { name: 'Enemy Operator', slots, grids }
+    const pockets = makeGrid('loot', 'pockets', 'Pockets', 5, 1)
+    this.fillGrid(pockets, randInt(0, 3), {})
+    return { name: 'Enemy Operator', slots, grids: [pockets] }
   }
 
   private createCrate(): LootContainer {

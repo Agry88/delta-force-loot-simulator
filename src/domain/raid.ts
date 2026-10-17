@@ -1,3 +1,4 @@
+import { gridsOf } from './grid.ts'
 import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotStorage, SlotType, Storage } from './models.ts'
 
 // Time limits offered on the start screen, in seconds.
@@ -41,37 +42,43 @@ export function freeAttachmentSlot(gun: Item, part: Item): SlotStorage | null {
   return gun.attachments.find((s) => !s.items.length && s.accepts === part.def.slot) ?? null
 }
 
+// A bag never goes inside itself, and only an empty one can be stowed in a grid.
+export function canHold(target: Storage, item: Item): boolean {
+  if (!item.storage) return true
+  return target !== item.storage && (target.kind === 'slot' || !item.storage.items.length)
+}
+
 // The item covering a storage cell (a slot has just the one).
 export function itemAt(storage: Storage, cx: number, cy: number): Item | null {
   if (storage.kind === 'slot') return storage.items[0] ?? null
   return storage.items.find((it) => cx >= it.x && cx < it.x + it.def.w && cy >= it.y && cy < it.y + it.def.h) ?? null
 }
 
-const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'pistol', 'melee']
+const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']
 const isGearSlot = (slot: SlotType | undefined) => GEAR_SLOTS.some((s) => s === slot)
 
 // What the item dialog offers, depending on the item and where it is.
-export type ItemAction = 'equip' | 'unequip' | 'pickUp' | 'putBack'
+export type ItemAction = 'equip' | 'unequip' | 'pickUp' | 'putBack' | 'drop'
 
 export function itemActions(item: Item, from: Storage): ItemAction[] {
   if (from.kind === 'slot' && from.locked) return []
   const equip: ItemAction[] = isGearSlot(item.def.slot) ? ['equip'] : []
   if (from.owner === 'loot') return [...equip, 'pickUp']
-  return from.kind === 'slot' ? ['unequip', 'putBack'] : [...equip, 'putBack']
+  return from.kind === 'slot' ? ['unequip', 'putBack', 'drop'] : [...equip, 'putBack', 'drop']
 }
 
 // Where each action tries to put the item, first fit wins.
 export function itemActionTargets(action: ItemAction, player: Player, loot: LootContainer): Storage[] {
   if (action === 'equip') return player.slots
-  if (action === 'putBack') return [...loot.grids, ...loot.slots]
-  return player.grids
+  if (action === 'putBack') return [...gridsOf(loot), ...loot.slots]
+  return gridsOf(player)
 }
 
 // Where a click sends an item: loot goes onto the player (slots first if equippable), player items go back to the container.
 export function quickMoveTargets(item: Item, from: Storage, player: Player, loot: LootContainer): Storage[] {
   return from.owner === 'loot'
-    ? [...(item.def.slot ? player.slots : []), ...player.grids]
-    : [...loot.grids, ...loot.slots]
+    ? [...(item.def.slot ? player.slots : []), ...gridsOf(player)]
+    : [...gridsOf(loot), ...loot.slots]
 }
 
 export function raidResult(storages: Storage[], containersOpened: number): RaidResult {

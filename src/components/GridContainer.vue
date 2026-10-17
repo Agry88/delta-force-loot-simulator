@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import ItemTile from './ItemTile.vue'
+import { gridCells } from '../domain/grid.ts'
 import type { GridStorage, Item } from '../domain/models.ts'
 
 interface Props {
@@ -18,6 +19,9 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const gridEl = useTemplateRef('grid')
 
+// Cells at the end of the last row that a bag doesn't have.
+const blocked = computed(() => props.grid.w * props.grid.h - gridCells(props.grid))
+
 function onDrop(e: DragEvent) {
   if (!gridEl.value) return
   const r = gridEl.value.getBoundingClientRect()
@@ -28,6 +32,7 @@ function onDrop(e: DragEvent) {
 
 <template>
   <div ref="grid" class="grid" :style="{ '--w': grid.w, '--h': grid.h }" @dragover.prevent @drop.prevent="onDrop">
+    <div v-if="blocked" class="blocked" :style="{ '--bw': blocked }" />
     <ItemTile
       v-for="item in grid.items"
       :key="item.uid"
@@ -52,6 +57,16 @@ function onDrop(e: DragEvent) {
     linear-gradient(var(--cell-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--cell-line) 1px, transparent 1px);
   background-size: var(--cell) var(--cell);
+}
+.blocked {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(var(--bw) * var(--cell) + 1px);
+  height: calc(var(--cell) + 1px);
+  background: repeating-linear-gradient(135deg, #161c21 0 6px, #0e1215 6px 12px);
+  border-left: 1px solid var(--cell-line);
+  border-top: 1px solid var(--cell-line);
 }
 .placed {
   position: absolute;

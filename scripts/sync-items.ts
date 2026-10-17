@@ -1,4 +1,4 @@
-// Snapshots item names, sizes and auction prices from deltaforceapi.com into
+// Snapshots item names, sizes, auction prices and bag capacities from deltaforceapi.com into
 // src/data/itemRepository/catalog.json, so the game never calls the API at runtime.
 //
 //   DFAPI_KEY=... pnpm sync-items      (or put DFAPI_KEY in .env)
@@ -48,6 +48,14 @@ function parseItem(v: unknown): ApiItem | null {
 function parsePrice(v: unknown): number {
   const p = isRecord(v) && isRecord(v.price) ? v.price : {}
   return num(p.price) || num(p.referencePrice) || 0
+}
+
+// Chest rigs and backpacks only state their capacity in the description: "Offers 40 storage slots."
+const BAG_SUBS = ['ITEM_TYPE_SUB_GEAR_CHEST_RIG', 'ITEM_TYPE_SUB_GEAR_BACKPACK']
+function parseCapacity(v: unknown): number | undefined {
+  const desc = isRecord(v) && isRecord(v.item) ? str(v.item.description) : undefined
+  const n = desc?.match(/Offers (\d+) (?:storage|quick-use) slots/)?.[1]
+  return n ? Number(n) : undefined
 }
 
 // Items bigger than the largest container (7x4) could never be placed.
@@ -112,7 +120,7 @@ async function mapPool<T extends { name: string }, R>(items: T[], fn: (item: T) 
       while (next < items.length) {
         const i = next++
         out[i] = await fn(items[i]).catch((e: Error) => (console.warn(`\n${items[i].name}: ${e.message}`), null))
-        process.stdout.write(`\rprices ${++done}/${items.length}`)
+        process.stdout.write(`\r${++done}/${items.length}`)
       }
     }),
   )
@@ -132,6 +140,10 @@ const candidates = all
 
 const prices = await mapPool(candidates, async (it) => parsePrice(await call('GetItemAuctionPrice', { itemId: it.id })))
 
+const bags = candidates.filter((it) => it.typeSub && BAG_SUBS.includes(it.typeSub))
+const capacities = await mapPool(bags, async (it) => parseCapacity(await call('GetItem', { id: it.id })))
+const capacity = new Map(bags.map((it, i) => [it.id, capacities[i] ?? undefined]))
+
 const catalog = candidates
   .map((it, i) => ({
     id: it.id,
@@ -142,6 +154,7 @@ const catalog = candidates
     w: it.w,
     h: it.h,
     price: prices[i] ?? 0,
+    capacity: capacity.get(it.id),
   }))
   .filter((it) => it.price > 0)
   .sort((a, b) => a.name.localeCompare(b.name))
