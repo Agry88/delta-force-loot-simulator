@@ -74,7 +74,6 @@ export default {
     'Energy Drink': '能量飲料',
     Screws: '螺絲',
     Lighter: '打火機',
-    'Combat Knife': '戰術刀',
     '5.56x45 Ammo': '5.56x45 子彈',
     'First Aid Kit': '急救包',
     'Canned Food': '罐頭',
@@ -110,7 +109,6 @@ export default {
     Helmet: '頭盔',
     'Body Armor': '防彈衣',
     Pistol: '手槍',
-    Melee: '近戰武器',
 
     // Gun attachment slots
     'Rear Grip': '後握把',

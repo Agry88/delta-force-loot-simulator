@@ -2,7 +2,7 @@ export type Rarity = 1 | 2 | 3 | 4 | 5 | 6
 
 export type Category = 'weapon' | 'part' | 'gear' | 'ammo' | 'med' | 'tech' | 'valuable' | 'misc'
 
-export type GearSlot = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'melee' | 'rig' | 'backpack'
+export type GearSlot = 'weapon' | 'helmet' | 'armor' | 'pistol' | 'rig' | 'backpack'
 
 // Which kind of part a gun's attachment slot takes.
 export type PartSlot =
