@@ -6,7 +6,7 @@ import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSpot, fits, gridsOf, growToFit, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
-import { canHold, carryWeight, containerCount, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootShare, lootValue, maxLootValue, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
+import { bestHaul, canHold, carriedValue, carryWeight, containerCount, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootShare, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
@@ -34,7 +34,6 @@ const containers = ref(Array.from({ length: containerCount(props.duration) }, ()
 const current = ref(0)
 const visited = reactive(new Set([0]))
 const loot = computed(() => containers.value[current.value])
-const maxValue = maxLootValue(containers.value)
 // One pile for the whole raid, so dropped things are still there after moving between containers.
 const ground = ref(lootGenerator.createGround())
 // The loot panel shows either the container or what's been dropped on the ground.
@@ -51,8 +50,11 @@ const lootGrids = computed(() => gridsOf(loot.value))
 const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrids.value])
 const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value, groundGrid.value])
 
-const earnings = computed(() => lootValue(playerStorages.value))
-const share = computed(() => lootShare(earnings.value, maxValue))
+// Earnings are profit: what you carry now against what you came in with, which you lose by dropping it.
+const startValue = carriedValue(playerStorages.value)
+const maxProfit = bestHaul(player, containers.value) - startValue
+const earnings = computed(() => carriedValue(playerStorages.value) - startValue)
+const share = computed(() => lootShare(earnings.value, maxProfit))
 const weight = computed(() => carryWeight(playerStorages.value))
 const searching = computed(() => lootGrids.value.some((g) => g.items.some((it) => !it.revealed)))
 
@@ -73,7 +75,7 @@ function finish() {
   clearInterval(timerId)
   searchToken++
   hideTooltip()
-  emit('finish', raidResult(playerStorages.value, visited.size, maxValue))
+  emit('finish', raidResult(playerStorages.value, visited.size, startValue, maxProfit))
 }
 
 function onKey(e: KeyboardEvent) {
@@ -338,7 +340,7 @@ const tipStyle = computed(() => ({
           {{ t('raid.earnings') }}
           <span class="coin" />
           <b>{{ formatValue(earnings) }}</b>
-          <small class="max">/ {{ formatValue(maxValue) }}</small>
+          <small class="max">/ {{ formatValue(maxProfit) }}</small>
           <span class="share" :class="{ full: share === 100 }">{{ share }}%</span>
         </div>
         <div class="share-bar"><span :style="{ width: `${share}%` }" /></div>

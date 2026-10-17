@@ -1,7 +1,7 @@
 export default {
   ui: {
     'start.title': 'LOOT SIMULATOR',
-    'start.sub': '{count} containers, {seconds} seconds. Carry out as much of their loot as you can — 100% is a perfect raid.',
+    'start.sub': '{count} containers, {seconds} seconds, and bags already half full. Swap your junk for the best loot — 100% is a perfect raid.',
     'start.durationLabel': 'TIME LIMIT',
     'start.durationOption': '{seconds}s',
     'start.modeLabel': 'LOOT FROM',
@@ -47,8 +47,9 @@ export default {
 
     'result.title': 'EXTRACTION SUCCESSFUL',
     'result.perfect': 'PERFECT RAID',
-    'result.total': 'Total Value',
-    'result.share': '{share}% of {max}',
+    'result.total': 'Profit',
+    'result.share': '{share}% of a {max} best haul',
+    'result.lost': 'incl. −{value} of your own gear left behind',
     'result.items': 'Items',
     'result.containers': 'Containers',
     'result.best': 'Best find',

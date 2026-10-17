@@ -3,7 +3,7 @@ import type { Messages } from './index.ts'
 export default {
   ui: {
     'start.title': '戰利品模擬器',
-    'start.sub': '{count} 個容器，{seconds} 秒。盡可能帶走所有戰利品——100% 就是完美撤離。',
+    'start.sub': '{count} 個容器，{seconds} 秒，背包已經半滿。用最值錢的戰利品換掉你的雜物——100% 就是完美撤離。',
     'start.durationLabel': '時間限制',
     'start.durationOption': '{seconds} 秒',
     'start.modeLabel': '搜刮目標',
@@ -49,8 +49,9 @@ export default {
 
     'result.title': '撤離成功',
     'result.perfect': '完美撤離',
-    'result.total': '總價值',
-    'result.share': '{max} 中的 {share}%',
+    'result.total': '利潤',
+    'result.share': '最佳收穫 {max} 的 {share}%',
+    'result.lost': '含遺留自身物品 −{value}',
     'result.items': '物品',
     'result.containers': '容器',
     'result.best': '最佳收穫',

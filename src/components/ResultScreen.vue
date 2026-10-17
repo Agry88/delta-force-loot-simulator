@@ -18,8 +18,8 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const items = computed(() => [...props.result.items].sort((a, b) => b.value - a.value))
-const total = computed(() => items.value.reduce((s, it) => s + it.value, 0))
-const share = computed(() => lootShare(total.value, props.result.maxValue))
+const total = computed(() => items.value.reduce((s, it) => s + it.value, 0) - props.result.lost)
+const share = computed(() => lootShare(total.value, props.result.maxProfit))
 const best = computed(() => items.value[0])
 const byRarity = computed(() =>
   RARITY_LIST.map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length })).filter((x) => x.count),
@@ -34,7 +34,8 @@ const byRarity = computed(() =>
       <div class="big">
         <span class="label">{{ t('result.total') }}</span>
         <b>{{ formatValue(total) }}</b>
-        <span class="of">{{ t('result.share', { share, max: formatValue(result.maxValue) }) }}</span>
+        <span class="of">{{ t('result.share', { share, max: formatValue(result.maxProfit) }) }}</span>
+        <span v-if="result.lost > 0" class="of">{{ t('result.lost', { value: formatValue(result.lost) }) }}</span>
       </div>
       <div><span class="label">{{ t('result.items') }}</span><b>{{ items.length }}</b></div>
       <div><span class="label">{{ t('result.containers') }}</span><b>{{ result.containersOpened }}</b></div>
