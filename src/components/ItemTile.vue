@@ -55,7 +55,7 @@ function onHover(e: MouseEvent) {
     ref="tile"
     class="tile"
     :data-uid="item.uid"
-    :class="[`r${item.def.rarity}`, mode, { hidden: !item.revealed, searching: item.searching, locked, attachable }]"
+    :class="[`r${item.def.rarity}`, `in-${mode}`, { hidden: !item.revealed, searching: item.searching, locked, attachable }]"
     :draggable="item.revealed && !locked"
     @dragstart="onDragStart"
     @mouseenter="onHover"
@@ -81,37 +81,36 @@ function onHover(e: MouseEvent) {
   overflow: hidden;
   user-select: none;
   cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--rc) 55%, #000);
-  background:
-    linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--rc) 22%, transparent)),
-    linear-gradient(160deg, color-mix(in srgb, var(--rc) 42%, #161b20), color-mix(in srgb, var(--rc) 18%, #11151a));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  /* A flat rarity fill, with the grid's cell lines still showing through it. */
+  background-color: color-mix(in srgb, var(--rc) 30%, #161b20);
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 0 0 / 0.28) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+  background-position: -1px -1px;
   animation: reveal 0.3s ease-out;
 }
 .tile:hover {
-  border-color: #e8edf2;
+  box-shadow: inset 0 0 0 1px #e8edf2;
 }
-.tile.slot {
+.tile.in-slot {
   width: 100%;
   height: 100%;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--rc) 26%, #1a2026), #141a1f);
-  border-color: color-mix(in srgb, var(--rc) 40%, #2a333c);
+  background-image: none;
 }
 .tile.attachable {
-  border-color: #fff;
-  box-shadow: inset 0 0 0 999px rgb(255 255 255 / 0.22);
+  box-shadow: inset 0 0 0 1px #fff, inset 0 0 0 999px rgb(255 255 255 / 0.22);
 }
 .tile.locked {
   cursor: default;
 }
 .tile.hidden {
   cursor: default;
-  border-color: #2e3740;
   background: repeating-linear-gradient(135deg, #1b2228 0 5px, #161c21 5px 10px);
   animation: none;
 }
 .tile.hidden:hover {
-  border-color: #2e3740;
+  box-shadow: none;
 }
 
 .name {
@@ -145,7 +144,7 @@ function onHover(e: MouseEvent) {
   filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.6));
   pointer-events: none;
 }
-.slot .icon {
+.in-slot .icon {
   font-size: 38px;
 }
 .corner {
