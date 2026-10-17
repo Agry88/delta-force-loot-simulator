@@ -6,7 +6,7 @@ import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
 import { findSpot, fits, gridsOf, growToFit, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
-import { canHold, carryWeight, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootValue, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
+import { canHold, carryWeight, containerCount, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootShare, lootValue, maxLootValue, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
 import { formatClock, formatValue } from '../lib/format.ts'
@@ -29,13 +29,18 @@ const props = withDefaults(defineProps<Props>(), { mode: 'both' })
 const emit = defineEmits<Emits>()
 
 const player = reactive(lootGenerator.createPlayer())
-const loot = ref(lootGenerator.createLootContainer(props.mode))
+// Every container is rolled up front, so the raid's total value is known from the start.
+const containers = ref(Array.from({ length: containerCount(props.duration) }, () => lootGenerator.createLootContainer(props.mode)))
+const current = ref(0)
+const visited = reactive(new Set([0]))
+const loot = computed(() => containers.value[current.value])
+const maxValue = maxLootValue(containers.value)
+// One pile for the whole raid, so dropped things are still there after moving between containers.
 const ground = ref(lootGenerator.createGround())
 // The loot panel shows either the container or what's been dropped on the ground.
 const viewingGround = ref(false)
 const shownLoot = computed(() => (viewingGround.value ? ground.value : loot.value))
 const groundGrid = computed(() => ground.value.grids[0])
-const containersOpened = ref(1)
 const remaining = ref(props.duration)
 const toast = ref('')
 
@@ -47,6 +52,7 @@ const playerStorages = computed<Storage[]>(() => [...player.slots, ...playerGrid
 const allStorages = computed<Storage[]>(() => [...playerStorages.value, ...loot.value.slots, ...lootGrids.value, groundGrid.value])
 
 const earnings = computed(() => lootValue(playerStorages.value))
+const share = computed(() => lootShare(earnings.value, maxValue))
 const weight = computed(() => carryWeight(playerStorages.value))
 const searching = computed(() => lootGrids.value.some((g) => g.items.some((it) => !it.revealed)))
 
@@ -67,7 +73,7 @@ function finish() {
   clearInterval(timerId)
   searchToken++
   hideTooltip()
-  emit('finish', raidResult(playerStorages.value, containersOpened.value))
+  emit('finish', raidResult(playerStorages.value, visited.size, maxValue))
 }
 
 function onKey(e: KeyboardEvent) {
@@ -117,12 +123,12 @@ async function runSearch() {
   }
 }
 
-function nextContainer() {
+function openContainer(index: number) {
+  if (index === current.value && !viewingGround.value) return
   hideTooltip()
-  loot.value = lootGenerator.createLootContainer(props.mode)
-  ground.value = lootGenerator.createGround()
+  current.value = index
+  visited.add(index)
   viewingGround.value = false
-  containersOpened.value++
   runSearch()
 }
 
@@ -332,7 +338,10 @@ const tipStyle = computed(() => ({
           {{ t('raid.earnings') }}
           <span class="coin" />
           <b>{{ formatValue(earnings) }}</b>
+          <small class="max">/ {{ formatValue(maxValue) }}</small>
+          <span class="share" :class="{ full: share === 100 }">{{ share }}%</span>
         </div>
+        <div class="share-bar"><span :style="{ width: `${share}%` }" /></div>
         <div class="scroll">
           <StorageSection
             v-for="s in playerSections"
@@ -358,7 +367,18 @@ const tipStyle = computed(() => ({
             {{ viewingGround ? t('raid.backToLoot') : t('raid.ground', { n: groundGrid.items.length }) }}
           </button>
         </div>
-        <div :key="`${containersOpened}-${viewingGround}`" class="scroll">
+        <nav class="container-tabs">
+          <button
+            v-for="(c, i) in containers"
+            :key="i"
+            :class="{ active: i === current && !viewingGround, visited: visited.has(i) }"
+            :title="tn(c.name)"
+            @click="openContainer(i)"
+          >
+            {{ i + 1 }}
+          </button>
+        </nav>
+        <div :key="`${current}-${viewingGround}`" class="scroll">
           <div v-if="shownLoot.slots.length" class="loot-gear">
             <SlotBox v-for="s in weaponSlots(shownLoot)" :key="s.id" :slot="s" v-on="on(s)" />
             <SlotBox v-for="s in wornGearSlots(shownLoot)" :key="s.id" :slot="s" v-on="on(s)" />
@@ -368,7 +388,9 @@ const tipStyle = computed(() => ({
               <SlotBox class="bag" :slot="s.slot" v-on="on(s.slot)" />
             </template>
           </StorageSection>
-          <button v-if="!viewingGround" class="next" @click="nextContainer">{{ t('raid.next') }}</button>
+          <button v-if="!viewingGround && current < containers.length - 1" class="next" @click="openContainer(current + 1)">
+            {{ t('raid.next') }}
+          </button>
         </div>
       </section>
     </main>
@@ -584,6 +606,29 @@ kbd {
 .menu {
   color: var(--muted);
 }
+.max {
+  color: var(--muted);
+  font-weight: 500;
+}
+.share {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.share.full {
+  color: var(--accent);
+}
+.share-bar {
+  height: 3px;
+  margin: -6px 4px 10px;
+  background: #2a3138;
+}
+.share-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
 .coin {
   display: inline-block;
   width: 12px;
@@ -635,6 +680,35 @@ kbd {
 .ground-toggle:hover {
   color: #fff;
   background: rgb(0 0 0 / 0.4);
+}
+.container-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.container-tabs button {
+  min-width: 34px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #161c22;
+  border: 1px solid #2c353e;
+  cursor: pointer;
+}
+.container-tabs button.visited {
+  color: var(--text);
+}
+.container-tabs button:hover {
+  color: var(--text-strong);
+  border-color: #4a5560;
+}
+.container-tabs button.active {
+  color: #fff;
+  border-color: #e5484d;
+  background: #4a1418;
 }
 .loot-gear {
   display: flex;

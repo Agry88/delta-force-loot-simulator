@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { lootShare } from '../domain/raid.ts'
 import { RARITIES, RARITY_LIST } from '../domain/rarity.ts'
 import { formatValue } from '../lib/format.ts'
 import { t, tn } from '../i18n/index.ts'
@@ -18,6 +19,7 @@ const emit = defineEmits<Emits>()
 
 const items = computed(() => [...props.result.items].sort((a, b) => b.value - a.value))
 const total = computed(() => items.value.reduce((s, it) => s + it.value, 0))
+const share = computed(() => lootShare(total.value, props.result.maxValue))
 const best = computed(() => items.value[0])
 const byRarity = computed(() =>
   RARITY_LIST.map((rarity) => ({ rarity, count: items.value.filter((it) => it.rarity === rarity).length })).filter((x) => x.count),
@@ -26,12 +28,13 @@ const byRarity = computed(() =>
 
 <template>
   <div class="result">
-    <h1>{{ t('result.title') }}</h1>
+    <h1>{{ t(share === 100 ? 'result.perfect' : 'result.title') }}</h1>
 
     <div class="summary">
       <div class="big">
         <span class="label">{{ t('result.total') }}</span>
         <b>{{ formatValue(total) }}</b>
+        <span class="of">{{ t('result.share', { share, max: formatValue(result.maxValue) }) }}</span>
       </div>
       <div><span class="label">{{ t('result.items') }}</span><b>{{ items.length }}</b></div>
       <div><span class="label">{{ t('result.containers') }}</span><b>{{ result.containersOpened }}</b></div>
@@ -108,6 +111,11 @@ h1 {
 .summary .big b {
   font-size: 30px;
   color: var(--accent);
+}
+.of {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 .best {

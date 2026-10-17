@@ -4,6 +4,11 @@ import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotStorage, Sl
 // Time limits offered on the start screen, in seconds.
 export const RAID_DURATIONS = [15, 30, 60, 120]
 
+// How many containers a raid has: one more for every 15 seconds on the clock.
+export function containerCount(duration: number): number {
+  return Math.ceil(duration / 15) + 1
+}
+
 // The item plus any parts attached to it.
 function withAttachments(item: Item): Item[] {
   return [item, ...item.attachments.flatMap((s) => s.items)]
@@ -24,6 +29,16 @@ export function lootValue(storages: Storage[]): number {
   return storages
     .flatMap((s) => s.items.flatMap(withAttachments))
     .reduce((t, it) => t + (it.owned ? 0 : it.value), 0)
+}
+
+// Everything the raid's containers hold, i.e. the most loot a player could carry out.
+export function maxLootValue(containers: LootContainer[]): number {
+  return lootValue(containers.flatMap((c) => [...c.slots, ...gridsOf(c)]))
+}
+
+// Whole percent of the max value taken, so 100 means every last item.
+export function lootShare(value: number, max: number): number {
+  return max ? Math.floor((value / max) * 100) : 100
 }
 
 // Carried weight in kg: a base kit plus what's carried.
@@ -95,8 +110,9 @@ export function isUpgrade(item: Item, slot: SlotStorage): boolean {
 
 const wornRarity = (slot: SlotStorage) => slot.items[0]?.def.rarity ?? 0
 
-export function raidResult(storages: Storage[], containersOpened: number): RaidResult {
+export function raidResult(storages: Storage[], containersOpened: number, maxValue: number): RaidResult {
   return {
+    maxValue,
     items: storages.flatMap((s) => s.items.flatMap(withAttachments).filter((it) => !it.owned).map((it) => ({ ...it.def, value: it.value, where: s.name }))),
     containersOpened,
   }

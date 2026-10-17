@@ -1,7 +1,7 @@
 export default {
   ui: {
     'start.title': 'LOOT SIMULATOR',
-    'start.sub': 'You have {seconds} seconds. Search containers, grab the best loot, extract.',
+    'start.sub': '{count} containers, {seconds} seconds. Carry out as much of their loot as you can — 100% is a perfect raid.',
     'start.durationLabel': 'TIME LIMIT',
     'start.durationOption': '{seconds}s',
     'start.modeLabel': 'LOOT FROM',
@@ -20,7 +20,7 @@ export default {
     'raid.loot': 'LOOT',
     'raid.searching': 'Searching…',
     'raid.searched': 'Searched',
-    'raid.next': 'Search next container →',
+    'raid.next': 'Next container →',
     'raid.ground': 'Ground ({n})',
     'raid.backToLoot': '← Container',
     'raid.hintQuickMove': 'Quick Move',
@@ -46,7 +46,9 @@ export default {
     'storage.size': '{w}×{h} storage',
 
     'result.title': 'EXTRACTION SUCCESSFUL',
+    'result.perfect': 'PERFECT RAID',
     'result.total': 'Total Value',
+    'result.share': '{share}% of {max}',
     'result.items': 'Items',
     'result.containers': 'Containers',
     'result.best': 'Best find',

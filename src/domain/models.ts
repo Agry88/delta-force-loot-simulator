@@ -105,4 +105,6 @@ export interface ResultItem extends ItemDef {
 export interface RaidResult {
   items: ResultItem[]
   containersOpened: number
+  // The value of all loot the raid started with.
+  maxValue: number
 }
