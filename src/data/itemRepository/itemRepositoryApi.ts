@@ -76,12 +76,9 @@ function toDef(it: CatalogEntry): ItemDef {
   }
 }
 
-// Items from the deltaforceapi.com snapshot. The API has no melee weapons, so the knife stays hand-made.
+// Items from the deltaforceapi.com snapshot.
 export class ItemRepositoryApi implements ItemRepository {
-  private readonly items: ItemDef[] = [
-    ...catalog.items.map(toDef),
-    { name: 'Combat Knife', icon: '🔪', cat: 'weapon', slot: 'melee', rarity: 1, w: 2, h: 1, value: 1500 },
-  ]
+  private readonly items: ItemDef[] = catalog.items.map(toDef)
 
   getAll(): ItemDef[] {
     return this.items

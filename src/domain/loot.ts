@@ -17,7 +17,6 @@ const SLOTS: Pick<SlotStorage, 'id' | 'name' | 'accepts' | 'label' | 'wide'>[] =
   { id: 'rig', name: 'Chest Rig', accepts: 'rig' },
   { id: 'backpack', name: 'Backpack', accepts: 'backpack' },
   { id: 'pistol', name: 'Pistol', accepts: 'pistol' },
-  { id: 'melee', name: 'Melee', accepts: 'melee' },
 ]
 
 interface AttachmentSlot {
@@ -54,7 +53,7 @@ const GUN_SPECIFIC: PartSlot[] = ['barrel', 'stock', 'magazine']
 const ATTACHMENT_CHANCE = 0.35
 
 // Chance an enemy body has something in each slot.
-const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, rig: 0.85, backpack: 0.7, pistol: 0.45, melee: 0.5 }
+const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, rig: 0.85, backpack: 0.7, pistol: 0.45 }
 
 // Share of the rig, pockets and backpack the player's starting stash fills, so there's no room for everything.
 const STASH_FILL = 0.6
@@ -178,8 +177,6 @@ export class LootGenerator {
     equip('armor', 'Light Vest', 0)
     equip('rig', 'DSA Tactical Chest Rig')
     equip('backpack', 'DASH Tactical Backpack')
-    equip('melee', 'Combat Knife')
-    slot('melee').locked = true
 
     const player: Player = {
       slots,

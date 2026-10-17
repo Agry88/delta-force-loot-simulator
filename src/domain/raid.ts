@@ -100,7 +100,7 @@ export function itemAt(storage: Storage, cx: number, cy: number): Item | null {
   return storage.items.find((it) => cx >= it.x && cx < it.x + it.def.w && cy >= it.y && cy < it.y + it.def.h) ?? null
 }
 
-const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'rig', 'backpack', 'pistol', 'melee']
+const GEAR_SLOTS: GearSlot[] = ['weapon', 'helmet', 'armor', 'rig', 'backpack', 'pistol']
 const isGearSlot = (slot: SlotType | undefined) => GEAR_SLOTS.some((s) => s === slot)
 
 // What the item dialog offers, depending on the item and where it is.
