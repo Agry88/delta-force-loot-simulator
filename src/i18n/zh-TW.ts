@@ -3,7 +3,7 @@ import type { Messages } from './index.ts'
 export default {
   ui: {
     'start.title': '戰利品模擬器',
-    'start.sub': '你有 {seconds} 秒。搜索容器、搶下最好的戰利品，然後撤離。',
+    'start.sub': '{count} 個容器，{seconds} 秒，背包已經半滿。用最值錢的戰利品換掉你的雜物——100% 就是完美撤離。',
     'start.durationLabel': '時間限制',
     'start.durationOption': '{seconds} 秒',
     'start.modeLabel': '搜刮目標',
@@ -22,7 +22,7 @@ export default {
     'raid.loot': '戰利品',
     'raid.searching': '搜索中…',
     'raid.searched': '已搜索',
-    'raid.next': '搜索下一個容器 →',
+    'raid.next': '下一個容器 →',
     'raid.ground': '地面 ({n})',
     'raid.backToLoot': '← 容器',
     'raid.hintQuickMove': '快速移動',
@@ -48,7 +48,10 @@ export default {
     'storage.size': '{w}×{h} 格空間',
 
     'result.title': '撤離成功',
-    'result.total': '總價值',
+    'result.perfect': '完美撤離',
+    'result.total': '利潤',
+    'result.share': '最佳收穫 {max} 的 {share}%',
+    'result.lost': '含遺留自身物品 −{value}',
     'result.items': '物品',
     'result.containers': '容器',
     'result.best': '最佳收穫',

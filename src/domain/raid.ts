@@ -1,8 +1,13 @@
-import { gridsOf } from './grid.ts'
-import type { GearSlot, Item, LootContainer, Player, RaidResult, SlotStorage, SlotType, Storage } from './models.ts'
+import { findSpot, gridsOf } from './grid.ts'
+import type { GearSlot, GridStorage, Item, LootContainer, Player, RaidResult, SlotStorage, SlotType, Storage } from './models.ts'
 
 // Time limits offered on the start screen, in seconds.
 export const RAID_DURATIONS = [15, 30, 60, 120]
+
+// How many containers a raid has: one more for every 15 seconds on the clock.
+export function containerCount(duration: number): number {
+  return Math.ceil(duration / 15) + 1
+}
 
 // The item plus any parts attached to it.
 function withAttachments(item: Item): Item[] {
@@ -19,11 +24,52 @@ export function itemValue(item: Item): number {
   return withAttachments(item).reduce((t, it) => t + it.value, 0)
 }
 
-// Gear you spawned with doesn't count as loot.
-export function lootValue(storages: Storage[]): number {
-  return storages
-    .flatMap((s) => s.items.flatMap(withAttachments))
-    .reduce((t, it) => t + (it.owned ? 0 : it.value), 0)
+// What everything in the storages is worth, attachments included.
+export function carriedValue(storages: Storage[]): number {
+  return storages.flatMap((s) => s.items).reduce((t, it) => t + itemValue(it), 0)
+}
+
+// Every storage on a player or body, slots first.
+const storagesOf = (p: Player): Storage[] => [...p.slots, ...gridsOf(p)]
+
+// The best haul keeps the worn rig and backpack, since another bag would change the space there is to fill.
+const KEPT_SLOTS: SlotType[] = ['rig', 'backpack']
+
+// An estimate of the most valuable load the player could walk out with: the priciest gear in each open slot,
+// then everything else packed by value per cell into the player's grids. A sharp player can sometimes beat it.
+export function bestHaul(player: Player, containers: LootContainer[]): number {
+  const kept = player.slots.filter((s) => s.locked || KEPT_SLOTS.includes(s.accepts))
+  const pool = [player, ...containers]
+    .flatMap(storagesOf)
+    .filter((s) => !kept.some((k) => k === s))
+    .flatMap((s) => s.items)
+    .sort((a, b) => itemValue(b) - itemValue(a))
+  let total = carriedValue(kept)
+  for (const slot of player.slots.filter((s) => !kept.includes(s))) {
+    const i = pool.findIndex((it) => it.def.slot === slot.accepts)
+    if (i < 0) continue
+    total += itemValue(pool[i])
+    pool.splice(i, 1)
+  }
+  // Packed into empty copies of the grids; bags count as emptied, since what's in them is in the pool too.
+  const grids = gridsOf(player).map((g): GridStorage => ({ ...g, items: [] }))
+  const density = (it: Item) => itemValue(it) / (it.def.w * it.def.h)
+  for (const item of pool.sort((a, b) => density(b) - density(a))) {
+    for (const grid of grids) {
+      const spot = findSpot(grid, item.def)
+      if (!spot) continue
+      grid.items.push({ ...item, ...spot })
+      total += itemValue(item)
+      break
+    }
+  }
+  return total
+}
+
+// Whole percent of the best haul's profit made, from 0 to 100.
+export function lootShare(profit: number, maxProfit: number): number {
+  if (maxProfit <= 0) return 100
+  return Math.max(0, Math.min(100, Math.floor((profit / maxProfit) * 100)))
 }
 
 // Carried weight in kg: a base kit plus what's carried.
@@ -95,9 +141,14 @@ export function isUpgrade(item: Item, slot: SlotStorage): boolean {
 
 const wornRarity = (slot: SlotStorage) => slot.items[0]?.def.rarity ?? 0
 
-export function raidResult(storages: Storage[], containersOpened: number): RaidResult {
+// startValue is what the player carried in; whatever of it they no longer carry counts as lost.
+export function raidResult(storages: Storage[], containersOpened: number, startValue: number, maxProfit: number): RaidResult {
+  const carried = storages.flatMap((s) => s.items.flatMap(withAttachments).map((it) => ({ it, where: s.name })))
+  const kept = carried.filter(({ it }) => it.owned).reduce((t, { it }) => t + it.value, 0)
   return {
-    items: storages.flatMap((s) => s.items.flatMap(withAttachments).filter((it) => !it.owned).map((it) => ({ ...it.def, value: it.value, where: s.name }))),
+    items: carried.filter(({ it }) => !it.owned).map(({ it, where }) => ({ ...it.def, value: it.value, where })),
+    lost: startValue - kept,
     containersOpened,
+    maxProfit,
   }
 }

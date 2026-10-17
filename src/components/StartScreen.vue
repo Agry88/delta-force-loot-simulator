@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { LOOT_MODES } from '../domain/loot.ts'
-import { RAID_DURATIONS } from '../domain/raid.ts'
+import { containerCount, RAID_DURATIONS } from '../domain/raid.ts'
 import { t } from '../i18n/index.ts'
 import type { LootMode } from '../domain/models.ts'
 
@@ -16,7 +16,7 @@ const emit = defineEmits<Emits>()
 <template>
   <div class="start">
     <h1>{{ t('start.title') }}</h1>
-    <p class="sub">{{ t('start.sub', { seconds: duration }) }}</p>
+    <p class="sub">{{ t('start.sub', { seconds: duration, count: containerCount(duration) }) }}</p>
     <div class="options" role="radiogroup" :aria-label="t('start.durationLabel')">
       <span class="options-label">{{ t('start.durationLabel') }}</span>
       <button

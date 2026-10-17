@@ -1,5 +1,5 @@
 import type { ItemRepository } from '../data/itemRepository/itemRepository.ts'
-import { findSlot, gridCells, randomSpot } from './grid.ts'
+import { findSlot, findSpot, gridCells, gridsOf, randomSpot, usedCells } from './grid.ts'
 import type { Category, GridStorage, Item, ItemDef, LootContainer, LootMode, Owner, PartSlot, Player, Rarity, SlotStorage, SlotType } from './models.ts'
 import { RARITY_WEIGHT } from './rarity.ts'
 
@@ -55,6 +55,9 @@ const ATTACHMENT_CHANCE = 0.35
 
 // Chance an enemy body has something in each slot.
 const BODY_SLOT_CHANCE: Record<string, number> = { weapon1: 0.8, weapon2: 0.35, helmet: 0.6, armor: 0.6, rig: 0.85, backpack: 0.7, pistol: 0.45, melee: 0.5 }
+
+// Share of the rig, pockets and backpack the player's starting stash fills, so there's no room for everything.
+const STASH_FILL = 0.6
 
 // Rig and backpack grids are this many cells wide; the panel fits 7 beside the bag's icon.
 const BAG_WIDTH = 7
@@ -178,9 +181,24 @@ export class LootGenerator {
     equip('melee', 'Combat Knife')
     slot('melee').locked = true
 
-    return {
+    const player: Player = {
       slots,
       grids: [makeGrid('player', 'pockets', 'Pockets', 5, 1), makeGrid('player', 'safebox', 'Safebox', 2, 2, '🔐')],
+    }
+    for (const grid of gridsOf(player)) {
+      if (grid.id !== 'safebox') this.fillStash(grid)
+    }
+    return player
+  }
+
+  // Packs the grid with things the player brought in, up to STASH_FILL of its cells. They're worth something, so dropping them costs.
+  private fillStash(grid: GridStorage) {
+    const room = gridCells(grid) * STASH_FILL
+    for (let attempt = 0; attempt < 40 && usedCells(grid) < room; attempt++) {
+      const def = this.pickItem()
+      if (def.capacity || usedCells(grid) + def.w * def.h > room) continue
+      const spot = findSpot(grid, def)
+      if (spot) grid.items.push(makeItem(def, { ...spot, revealed: true, owned: true }))
     }
   }
 
