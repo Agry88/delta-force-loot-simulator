@@ -70,9 +70,9 @@ function onDrop(e: DragEvent) {
 }
 .placed {
   position: absolute;
-  left: calc(var(--x) * var(--cell) + 2px);
-  top: calc(var(--y) * var(--cell) + 2px);
-  width: calc(var(--iw) * var(--cell) - 3px);
-  height: calc(var(--ih) * var(--cell) - 3px);
+  left: calc(var(--x) * var(--cell) + 1px);
+  top: calc(var(--y) * var(--cell) + 1px);
+  width: calc(var(--iw) * var(--cell) - 1px);
+  height: calc(var(--ih) * var(--cell) - 1px);
 }
 </style>
