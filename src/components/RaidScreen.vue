@@ -5,7 +5,7 @@ import SlotBox from './SlotBox.vue'
 import StorageSection from './StorageSection.vue'
 import ItemDialog from './ItemDialog.vue'
 import { lootGenerator } from '../di.ts'
-import { findSpot, fits, gridsOf, growToFit, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
+import { findSpot, fits, gridsOf, growToFit, repackWith, storageSections, weaponSlots, wornGearSlots } from '../domain/grid.ts'
 import { bestHaul, canHold, carriedValue, carryWeight, containerCount, freeAttachmentSlot, isUpgrade, itemActions, itemActionTargets, itemAt, lootShare, quickMoveTargets, raidResult, slotToSwap, storageOf } from '../domain/raid.ts'
 import type { ItemAction } from '../domain/raid.ts'
 import { RARITIES, SEARCH_TIME } from '../domain/rarity.ts'
@@ -166,6 +166,26 @@ function moveToFirst(item: Item, from: Storage, targets: Storage[]): boolean {
   return false
 }
 
+// Like moveToFirst, but when no target has a free spot big enough, re-packs the first of the player's grids
+// that would then have one. False when none would.
+function moveOrRepack(item: Item, from: Storage, targets: Storage[]): boolean {
+  if (moveToFirst(item, from, targets)) return true
+  for (const target of targets) {
+    if (target === from || target.kind !== 'grid' || target.owner !== 'player' || !canHold(target, item)) continue
+    const placements = repackWith(target, item)
+    if (!placements) continue
+    for (const p of placements) {
+      if (p.item === item) continue
+      p.item.x = p.x
+      p.item.y = p.y
+    }
+    const spot = placements.find((p) => p.item === item)
+    if (spot) moveItem(item, from, target, spot.x, spot.y)
+    return true
+  }
+  return false
+}
+
 // The ground always has room, and takes bags with things still in them.
 function dropItem(item: Item, from: Storage) {
   const spot = growToFit(groundGrid.value, item.def)
@@ -215,7 +235,7 @@ function itemAction(action: ItemAction) {
   // Equipping into a full slot trades places with what's worn there, better or not.
   const worn = action === 'equip' ? slotToSwap(item, player) : null
   if (worn) return swapGear(item, from, worn)
-  if (moveToFirst(item, from, itemActionTargets(action, player, shownLoot.value))) return
+  if (moveOrRepack(item, from, itemActionTargets(action, player, shownLoot.value))) return
   flash(t(action === 'equip' ? 'raid.cantEquip' : bagFullMessage(item)))
 }
 
@@ -225,7 +245,7 @@ function quickMove(item: Item, from: Storage) {
   // Double-clicking only swaps out worn gear for something rarer.
   const worn = from.owner === 'loot' && item.def.slot ? slotToSwap(item, player) : null
   if (worn && isUpgrade(item, worn)) return swapGear(item, from, worn)
-  if (!moveToFirst(item, from, quickMoveTargets(item, from, player, shownLoot.value))) flash(t(bagFullMessage(item)))
+  if (!moveOrRepack(item, from, quickMoveTargets(item, from, player, shownLoot.value))) flash(t(bagFullMessage(item)))
 }
 
 // Wears the item, and the one it replaces takes its place: back in the loot, or in your bag when equipped from there.
